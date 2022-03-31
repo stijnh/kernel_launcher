@@ -234,7 +234,7 @@ bool in_range(T val) {
         std::numeric_limits<R>::max());
 }
 
-template <typename T>
+template<typename T>
 std::vector<T> range(T start, T end, T step) {
     std::vector<T> results;
     while (start < end) {
@@ -245,12 +245,12 @@ std::vector<T> range(T start, T end, T step) {
     return results;
 }
 
-template <typename T>
+template<typename T>
 std::vector<T> range(T start, T end) {
     return range(start, end, T {1});
 }
 
-template <typename T>
+template<typename T>
 std::vector<T> range(T end) {
     return range(T {0}, end);
 }

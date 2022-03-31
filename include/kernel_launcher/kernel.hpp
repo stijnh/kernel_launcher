@@ -6,6 +6,7 @@
 #include "kernel_launcher/config.hpp"
 #include "kernel_launcher/expr.hpp"
 #include "kernel_launcher/utils.hpp"
+#include "nlohmann/json.hpp"
 
 namespace kernel_launcher {
 
@@ -61,7 +62,10 @@ struct KernelBuilder: ConfigSpace {
         return *this;
     }
 
-    std::array<Expr<uint32_t>, 3> tune_block_size(std::vector<uint32_t> xs, std::vector<uint32_t> ys = {1}, std::vector<uint32_t> zs = {1}) {
+    std::array<Expr<uint32_t>, 3> tune_block_size(
+        std::vector<uint32_t> xs,
+        std::vector<uint32_t> ys = {1},
+        std::vector<uint32_t> zs = {1}) {
         Expr<uint32_t> x = tune("block_size_x", std::move(xs));
         Expr<uint32_t> y = tune("block_size_y", std::move(ys));
         Expr<uint32_t> z = tune("block_size_z", std::move(zs));
@@ -104,7 +108,8 @@ struct KernelBuilder: ConfigSpace {
         return *this;
     }
 
-    Expr<std::string> tune_compiler_flag(std::string name, std::vector<std::string> values) {
+    Expr<std::string>
+    tune_compiler_flag(std::string name, std::vector<std::string> values) {
         Expr<std::string> e = tune(std::move(name), std::move(values));
         compiler_flag(e);
         return e;
@@ -139,7 +144,8 @@ struct KernelBuilder: ConfigSpace {
         return *this;
     }
 
-    Expr<std::string> tune_define(std::string name, std::vector<std::string> values) {
+    Expr<std::string>
+    tune_define(std::string name, std::vector<std::string> values) {
         Expr<std::string> e = tune(name, values);
         define(name, e);
         return e;
@@ -190,20 +196,58 @@ struct KernelBuilder: ConfigSpace {
 
         uint32_t shared_mem = eval(_shared_mem);
 
-        CudaModule module = compiler.compile(
-            _kernel_source,
-            _kernel_name,
-            template_args,
-            parameter_types,
-            options,
-            nullptr,
-            block_size).get();
+        CudaModule module = compiler
+                                .compile(
+                                    _kernel_source,
+                                    _kernel_name,
+                                    template_args,
+                                    parameter_types,
+                                    options,
+                                    nullptr,
+                                    block_size)
+                                .get();
 
         return RawKernel(
             std::move(module),
             block_size,
             grid_divisor,
             shared_mem);
+    }
+
+    nlohmann::json to_json() const {
+        using nlohmann::json;
+        json result = ConfigSpace::to_json();
+
+        result["kernel_name"] = _kernel_name;
+        result["block_size"] = {
+            _block_size[0].to_json(),
+            _block_size[1].to_json(),
+            _block_size[2].to_json()};
+        result["grid_divisors"] = {
+            _grid_divisors[0].name(),
+            _grid_divisors[1].name(),
+            _grid_divisors[2].name()};
+        result["shared_mem"] = _shared_mem.to_json();
+
+        std::vector<json> template_args;
+        for (const auto& p : _template_args) {
+            template_args.push_back(p.name());
+        }
+        result["template_arg"] = template_args;
+
+        std::vector<json> compile_flags;
+        for (const auto& p : _compile_flags) {
+            compile_flags.push_back(p.name());
+        }
+        result["compile_flags"] = compile_flags;
+
+        std::unordered_map<std::string, json> defines;
+        for (const auto& d : _defines) {
+            defines[d.first] = d.second.to_json();
+        }
+        result["defines"] = defines;
+
+        return result;
     }
 
     Source _kernel_source;
@@ -217,6 +261,24 @@ struct KernelBuilder: ConfigSpace {
     std::unordered_map<std::string, Expr<std::string>> _defines {};
 };
 
+template<typename T>
+struct KernelArg {
+    using type = T;
+};
+
+template<typename T>
+struct KernelArg<T*> {
+    using type = MemoryView<T>;
+};
+
+template<typename T>
+struct KernelArg<const T*> {
+    using type = MemoryView<T>;
+};
+
+template<typename T>
+using kernel_arg_t = typename KernelArg<T>::type;
+
 template<typename... Args>
 struct KernelInstantiation {
     KernelInstantiation(
@@ -229,12 +291,12 @@ struct KernelInstantiation {
         //
     }
 
-    void launch(Args... args) const {
+    void launch(kernel_arg_t<Args>... args) const {
         std::array<void*, sizeof...(Args)> raw_args = {&args...};
         _kernel.launch(_stream, _problem_size, raw_args.data());
     }
 
-    void operator()(Args... args) const {
+    void operator()(kernel_arg_t<Args>... args) const {
         return launch(args...);
     }
 

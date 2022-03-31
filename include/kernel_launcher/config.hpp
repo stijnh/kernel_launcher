@@ -177,9 +177,10 @@ struct ConfigSpace {
         }
 
         Eval eval = {config.get()};
-        for (const auto &r: _restrictions) {
+        for (const auto& r : _restrictions) {
             if (!eval(r)) {
-                throw std::runtime_error("config does not pass restriction: " + r.name());
+                throw std::runtime_error(
+                    "config does not pass restriction: " + r.name());
             }
         }
 
@@ -188,20 +189,44 @@ struct ConfigSpace {
 
     ConfigIterator iterate() const;
 
+    nlohmann::json to_json() const {
+        using nlohmann::json;
+        json results = json::object();
+
+        std::unordered_map<std::string, json> params;
+        for (const auto& p : _params) {
+            std::vector<json> values;
+            for (const auto& v : p.second) {
+                values.push_back(v.to_json());
+            }
+
+            params[p.first.name()] = values;
+        }
+        results["parameters"] = params;
+
+        std::vector<json> restrictions;
+        for (const auto& d : _restrictions) {
+            restrictions.push_back(d.name());
+        }
+        results["restrictions"] = restrictions;
+
+        return results;
+    }
+
   private:
     std::unordered_map<TunableParam, std::vector<TunableValue>> _params;
     std::vector<Expr<bool>> _restrictions;
 };
 
 struct ConfigIterator {
-    ConfigIterator(ConfigSpace space): _space(std::move(space)) {
+    ConfigIterator(ConfigSpace space) : _space(std::move(space)) {
         _attempts = range(_space.size());
 
         std::default_random_engine rng {0};
         std::shuffle(_attempts.begin(), _attempts.end(), rng);
     }
 
-    bool next(Config &config) {
+    bool next(Config& config) {
         while (!_attempts.empty()) {
             size_t i = _attempts.back();
             _attempts.pop_back();

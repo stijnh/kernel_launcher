@@ -42,8 +42,12 @@ template<typename R>
 struct BaseExpr {
     using return_type = R;
 
-    virtual return_type eval(const Eval& eval) const = 0;
     virtual std::string name() const = 0;
+    virtual return_type eval(const Eval& eval) const = 0;
+    virtual nlohmann::json to_json() const {
+        throw std::runtime_error(
+            "expression cannot be converted to json: " + name());
+    }
 };
 
 template<typename T>
@@ -53,11 +57,15 @@ struct ParamExpr: BaseExpr<T> {
     }
 
     std::string name() const override {
-        return _param.name();
+        return "$" + _param.name();
     }
 
     T eval(const Eval& eval) const override {
         return eval.lookup<T>(_param);
+    }
+
+    nlohmann::json to_json() const override {
+        return _param.name();
     }
 
   private:
@@ -78,6 +86,10 @@ struct ScalarExpr: BaseExpr<T> {
 
     T eval(const Eval&) const override {
         return _value;
+    }
+
+    nlohmann::json to_json() const override {
+        return TunableValue(_value).to_json();
     }
 
   private:
@@ -192,6 +204,10 @@ struct OpExpr: BaseExpr<op_return_type<Op, Args...>> {
         return _name_helper(std::index_sequence_for<Args...>());
     }
 
+    //    nlohmann::json to_json() const override {
+    //        return _json_helper(std::index_sequence_for<Args...>());
+    //    }
+
   private:
     template<size_t... I>
     return_type
@@ -202,6 +218,12 @@ struct OpExpr: BaseExpr<op_return_type<Op, Args...>> {
     template<size_t... I>
     std::string _name_helper(std::index_sequence<I...>) const {
         return _op.name(std::get<I>(_args).name()...);
+    }
+
+    template<size_t... I>
+    nlohmann::json to_json(std::index_sequence<I...>) const {
+        //return _op.to_json(std::get<I>(_args).to_json()...);
+        return nullptr;
     }
 
   private:
@@ -278,8 +300,8 @@ BINARY_OP_IMPL(GteOp, >=)
 
 // This are rarely used and they cause a lot of confusion when expressions
 // are used in ostreams/istreams.
-//BINARY_OP_IMPL(ShlOp, <<)
-//BINARY_OP_IMPL(ShrOp, >>)
+// BINARY_OP_IMPL(ShlOp, <<)
+// BINARY_OP_IMPL(ShrOp, >>)
 #undef BINARY_OP_IMPL
 
 template<typename L>

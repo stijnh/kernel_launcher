@@ -32,10 +32,9 @@ struct CuException: std::runtime_error {
     CUresult _err;
 };
 
-#define cu_assert(expr) \
-    cu_assert_(expr, #expr)
+#define cu_assert(expr) cu_assert_(expr, #expr)
 
-void cu_assert_(CUresult err, const char *s) {
+void cu_assert_(CUresult err, const char* s) {
     if (err != CUDA_SUCCESS) {
         std::cout << "FAILED: " << s << std::endl;
         throw CuException(err);
@@ -105,7 +104,7 @@ struct CudaModule {
 template<typename T = char>
 struct Memory;
 
-template<typename T=char>
+template<typename T = char>
 struct MemoryView {
     MemoryView() {
         _device_ptr = nullptr;
@@ -113,12 +112,12 @@ struct MemoryView {
     }
 
     MemoryView(const MemoryView<T>& mem) {
-        _device_ptr = (T*) mem.get();
+        _device_ptr = (T*)mem.get();
         _size = mem.size();
     }
 
     MemoryView(const Memory<T>& mem) {
-        _device_ptr = mem.get();
+        _device_ptr = (T*)mem.get();
         _size = mem.size();
     }
 
@@ -134,19 +133,22 @@ struct MemoryView {
             throw std::runtime_error("size mismatch");
         }
 
-        cu_assert(cuMemcpy((CUdeviceptr) m._device_ptr, (CUdeviceptr) this->_device_ptr, this->size_in_bytes()));
+        cu_assert(cuMemcpy(
+            (CUdeviceptr)m._device_ptr,
+            (CUdeviceptr)this->_device_ptr,
+            this->size_in_bytes()));
     }
 
     void copy_from(MemoryView<T> m) {
         m.copy_to(*this);
     }
 
-    void copy_to(std::vector<T> &m) const {
+    void copy_to(std::vector<T>& m) const {
         copy_to(MemoryView<T>(m.data(), m.size()));
     }
 
-    void copy_from(const std::vector<T> &m) {
-        copy_from(MemoryView<T>((T*) m.data(), m.size()));
+    void copy_from(const std::vector<T>& m) {
+        copy_from(MemoryView<T>((T*)m.data(), m.size()));
     }
 
     std::vector<T> to_vector() const {
@@ -201,12 +203,12 @@ struct Memory: MemoryView<T> {
         *this = std::move(that);
     }
 
-    Memory& operator=(Memory&& that)  noexcept {
+    Memory& operator=(Memory&& that) noexcept {
         std::swap(this->_device_ptr, that._device_ptr);
         std::swap(this->_size, that._size);
     }
 
-    Memory(const std::vector<T> &values) {
+    Memory(const std::vector<T>& values) {
         allocate(values.size());
         this->copy_from(values);
     }
@@ -223,7 +225,8 @@ struct Memory: MemoryView<T> {
         free();
 
         if (n > 0) {
-            cu_assert(cuMemAlloc((CUdeviceptr*)&(this->_device_ptr), n * sizeof(T)));
+            cu_assert(
+                cuMemAlloc((CUdeviceptr*)&(this->_device_ptr), n * sizeof(T)));
             this->_size = n;
         }
     }

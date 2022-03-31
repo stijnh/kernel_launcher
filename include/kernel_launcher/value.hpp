@@ -27,13 +27,13 @@ struct TunableValue {
 
     TunableValue() {}
 
-    TunableValue(const char* value) :
-        _type(type_string),
-        _string_val(std::string(value)) {}
-
     TunableValue(std::string value) :
         _type(type_string),
         _string_val(std::move(value)) {}
+
+    TunableValue(const char* value) : TunableValue(std::string(value)) {}
+
+    TunableValue(Type t) : TunableValue(t.name()) {}
 
     TunableValue(double i) : _type(type_double), _double_val(i) {}
 
@@ -52,6 +52,7 @@ struct TunableValue {
                 using std::string;
                 _string_val.~string();
                 break;
+            case type_bool:
             case type_int:
             case type_double:
             case type_empty:
@@ -83,6 +84,10 @@ struct TunableValue {
             case type_empty:
                 _type = type_empty;
                 break;
+            case type_bool:
+                _type = type_bool;
+                _bool_val = val._bool_val;
+                break;
         }
 
         return *this;
@@ -104,6 +109,8 @@ struct TunableValue {
                 return std::to_string(_double_val);
             case type_string:
                 return _string_val;
+            case type_bool:
+                return _bool_val ? "true" : "false";
             default:
                 return "";
         }
@@ -152,6 +159,8 @@ struct TunableValue {
                 return this->_double_val == that._double_val;
             case type_string:
                 return this->_string_val == that._string_val;
+            case type_bool:
+                return this->_bool_val == that._bool_val;
             default:
                 return false;
         }
@@ -175,6 +184,8 @@ struct TunableValue {
                 return this->_double_val < that._double_val;
             case type_string:
                 return this->_string_val < that._string_val;
+            case type_bool:
+                return this->_bool_val < that._bool_val;
             default:
                 return false;
         }
@@ -212,8 +223,10 @@ struct TunableValue {
                 return _double_val;
             case type_string:
                 return _string_val;
+            case type_bool:
+                return _bool_val;
             case type_empty:
-                break;  //fallthrough
+                break;  // fallthrough
         }
 
         return nullptr;
@@ -237,7 +250,7 @@ struct TunableValue {
             case json::value_t::number_float:
                 return (json::number_float_t)obj;
             default:
-                break;  //fallthrough
+                break;  // fallthrough
         }
 
         throw std::runtime_error("unknown json object");
@@ -276,28 +289,35 @@ struct TunableValue {
         return this->to_float();
     }
 
-#define FOR_INTEGER(type, human_name)                         \
-  public:                                                     \
-    TunableValue(type i) : _type(type_int), _int_val(i) {}    \
-    bool is_##human_name() const {                            \
-        return _type == type_int && in_range<type>(_int_val); \
-    }                                                         \
-    type to_##human_name() const {                            \
-        if (is_##human_name()) {                              \
-            return (type)_int_val;                            \
-        }                                                     \
-        throw CastException(*this, type_of<type>());          \
-    }                                                         \
-    explicit operator type() const {                          \
-        return to_##human_name();                             \
-    }                                                         \
-                                                              \
-  private:                                                    \
-    bool is(TypeIndicator<type>) const {                      \
-        return this->is_##human_name();                       \
-    }                                                         \
-    type to(TypeIndicator<type>) const {                      \
-        return this->to_##human_name();                       \
+#define FOR_INTEGER(type, human_name)                               \
+  public:                                                           \
+    TunableValue(type i) : _type(type_int), _int_val(i) {}          \
+    bool is_##human_name() const {                                  \
+        if (_type == type_bool) {                                   \
+            return true;                                            \
+        } else if (_type == type_int && in_range<type>(_int_val)) { \
+            return true;                                            \
+        }                                                           \
+        return false;                                               \
+    }                                                               \
+    type to_##human_name() const {                                  \
+        if (_type == type_bool) {                                   \
+            return (type)_bool_val;                                 \
+        } else if (_type == type_int && in_range<type>(_int_val)) { \
+            return (type)_int_val;                                  \
+        }                                                           \
+        throw CastException(*this, type_of<type>());                \
+    }                                                               \
+    explicit operator type() const {                                \
+        return to_##human_name();                                   \
+    }                                                               \
+                                                                    \
+  private:                                                          \
+    bool is(TypeIndicator<type>) const {                            \
+        return this->is_##human_name();                             \
+    }                                                               \
+    type to(TypeIndicator<type>) const {                            \
+        return this->to_##human_name();                             \
     }
 
     FOR_INTEGER(char, char)
@@ -319,11 +339,13 @@ struct TunableValue {
         type_int,
         type_double,
         type_string,
+        type_bool,
     } _type = type_empty;
 
     union {
         intmax_t _int_val;
         double _double_val;
+        bool _bool_val;
         std::string _string_val;
     };
 };

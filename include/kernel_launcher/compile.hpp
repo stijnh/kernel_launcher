@@ -1,8 +1,9 @@
 #pragma once
 
 #include <nvrtc.h>
-#include <future>
+
 #include <fstream>
+#include <future>
 #include <sstream>
 #include <vector>
 
@@ -195,7 +196,7 @@ struct NvrtcCompiler: Compiler {
             &program,
             source_content.c_str(),
             source_name.c_str(),
-            0,  //numHeaders
+            0,  // numHeaders
             nullptr,  // headers
             nullptr  // includeNames
             ));
