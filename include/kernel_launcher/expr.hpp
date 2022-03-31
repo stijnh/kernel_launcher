@@ -42,11 +42,11 @@ template<typename R>
 struct BaseExpr {
     using return_type = R;
 
-    virtual std::string name() const = 0;
+    virtual std::string to_string() const = 0;
     virtual return_type eval(const Eval& eval) const = 0;
     virtual nlohmann::json to_json() const {
         throw std::runtime_error(
-            "expression cannot be converted to json: " + name());
+            "expression cannot be converted to json: " + to_string());
     }
 };
 
@@ -56,7 +56,7 @@ struct ParamExpr: BaseExpr<T> {
         //
     }
 
-    std::string name() const override {
+    std::string to_string() const override {
         return "$" + _param.name();
     }
 
@@ -65,7 +65,10 @@ struct ParamExpr: BaseExpr<T> {
     }
 
     nlohmann::json to_json() const override {
-        return _param.name();
+        return {
+            {"operator", "parameter"},
+            {"name", _param.name()},
+        };
     }
 
   private:
@@ -78,7 +81,7 @@ struct ScalarExpr: BaseExpr<T> {
         //
     }
 
-    std::string name() const override {
+    std::string to_string() const override {
         std::stringstream oss;
         oss << _value;
         return oss.str();
@@ -117,7 +120,7 @@ struct FunExpr: BaseExpr<R> {
         return _fun(eval);
     }
 
-    std::string name() const override {
+    std::string to_string() const override {
         return _name;
     }
 
@@ -177,177 +180,107 @@ template<typename T>
 expr_type<T> expr(T value) {
     return detail::ToExprHelper<T>::convert(std::move(value));
 }
-
-template<typename Op, typename... Args>
-using op_return_type = decltype(
-    std::declval<Op>().eval(std::declval<typename Args::return_type>()...));
-
-template<typename Op, typename... Args>
-struct OpExpr: BaseExpr<op_return_type<Op, Args...>> {
-    using return_type = op_return_type<Op, Args...>;
-
-    OpExpr(Op op, Args... args) :
-        _op(std::move(op)),
-        _args(std::move(args)...) {
-        //
-    }
-
-    OpExpr(Args... args) : _op({}), _args(std::move(args)...) {
-        //
-    }
-
-    return_type eval(const Eval& eval) const override {
-        return _eval_helper(eval, std::index_sequence_for<Args...>());
-    }
-
-    std::string name() const override {
-        return _name_helper(std::index_sequence_for<Args...>());
-    }
-
-    //    nlohmann::json to_json() const override {
-    //        return _json_helper(std::index_sequence_for<Args...>());
-    //    }
-
-  private:
-    template<size_t... I>
-    return_type
-    _eval_helper(const Eval& eval, std::index_sequence<I...>) const {
-        return _op.eval(eval(std::get<I>(_args))...);
-    }
-
-    template<size_t... I>
-    std::string _name_helper(std::index_sequence<I...>) const {
-        return _op.name(std::get<I>(_args).name()...);
-    }
-
-    template<size_t... I>
-    nlohmann::json to_json(std::index_sequence<I...>) const {
-        //return _op.to_json(std::get<I>(_args).to_json()...);
-        return nullptr;
-    }
-
-  private:
-    Op _op;
-    std::tuple<Args...> _args;
-};
-
-template<typename Op, typename... Args>
-OpExpr<Op, Args...> make_op(Op op, Args... args) {
-    return OpExpr<Op, Args...>(std::move(op), std::move(args)...);
-}
-
-#define UNARY_OP_IMPL(class_name, op)                                          \
-    struct class_name##Op {                                                    \
-        template<typename T>                                                   \
-        auto eval(T val) const {                                               \
-            return op val;                                                     \
+#define UNARY_OP_IMPL(class_name, fun, op)                                     \
+    template<                                                                  \
+        typename T,                                                            \
+        typename O = decltype(fun(std::declval<typename T::return_type>()))>   \
+    struct class_name: BaseExpr<O> {                                           \
+        class_name(T input) : _input(std::move(input)) {}                      \
+                                                                               \
+        O eval(const Eval& eval) const override {                              \
+            return fun(eval(_input));                                          \
         }                                                                      \
                                                                                \
-        std::string name(const std::string& name) const {                      \
-            std::stringstream oss;                                             \
-            oss << "(" << #op << name << ")";                                  \
-            return oss.str();                                                  \
+        std::string to_string() const override {                               \
+            return "(" #op + _input.to_string() + ")";                         \
         }                                                                      \
+                                                                               \
+        nlohmann::json to_json() const override {                              \
+            return {                                                           \
+                {"operator", #op},                                             \
+                {"operand", _input.to_json()},                                 \
+            };                                                                 \
+        }                                                                      \
+                                                                               \
+      private:                                                                 \
+        T _input;                                                              \
     };                                                                         \
-    template<typename T, typename = typename std::enable_if<is_expr<T>>::type> \
-    auto operator op(T value) {                                                \
-        return make_op(class_name##Op {}, expr(std::move(value)));             \
+                                                                               \
+    template<typename L, typename = typename std::enable_if<is_expr<L>>::type> \
+    auto operator op(L lhs) {                                                  \
+        return class_name<expr_type<L>>(expr(std::move(lhs)));                 \
     }
 
-UNARY_OP_IMPL(Neg, -)
-UNARY_OP_IMPL(Not, !)
-UNARY_OP_IMPL(Inv, ~)
+UNARY_OP_IMPL(Neg, std::negate<void> {}, -)
+UNARY_OP_IMPL(Not, std::logical_not<void> {}, !)
+UNARY_OP_IMPL(Inv, std::bit_not<void> {}, ~)
 #undef UNARY_OP_IMPL
 
-#define BINARY_OP_IMPL(class_name, op)                                       \
-    struct class_name {                                                      \
-        template<typename L, typename R>                                     \
-        auto eval(L left, R right) const {                                   \
-            return left op right;                                            \
-        }                                                                    \
-                                                                             \
-        std::string name(const std::string& l, const std::string& r) const { \
-            std::stringstream oss;                                           \
-            oss << "(" << l << #op << r << ")";                              \
-            return oss.str();                                                \
-        }                                                                    \
-    };                                                                       \
-    template<                                                                \
-        typename L,                                                          \
-        typename R,                                                          \
-        typename = typename std::enable_if<is_expr<L> || is_expr<R>>::type>  \
-    auto operator op(L left, R right) {                                      \
-        return make_op(                                                      \
-            class_name {},                                                   \
-            expr(std::move(left)),                                           \
-            expr(std::move(right)));                                         \
+#define BINARY_OP_IMPL(class_name, fun, op)                                 \
+    template<                                                               \
+        typename L,                                                         \
+        typename R,                                                         \
+        typename O = decltype(                                              \
+            fun(std::declval<typename L::return_type>(),                    \
+                std::declval<typename R::return_type>()))>                  \
+    struct class_name: BaseExpr<O> {                                        \
+        class_name(L lhs, R rhs) :                                          \
+            _lhs(std::move(lhs)),                                           \
+            _rhs(std::move(rhs)) {}                                         \
+                                                                            \
+        O eval(const Eval& eval) const override {                           \
+            return fun(eval(_lhs), eval(_rhs));                             \
+        }                                                                   \
+                                                                            \
+        std::string to_string() const override {                            \
+            return "(" + _lhs.to_string() + #op + _rhs.to_string() + ")";   \
+        }                                                                   \
+                                                                            \
+        nlohmann::json to_json() const override {                           \
+            return {                                                        \
+                {"operator", #op},                                          \
+                {"left", _lhs.to_json()},                                   \
+                {"right", _rhs.to_json()},                                  \
+            };                                                              \
+        }                                                                   \
+                                                                            \
+      private:                                                              \
+        L _lhs;                                                             \
+        R _rhs;                                                             \
+    };                                                                      \
+                                                                            \
+    template<                                                               \
+        typename L,                                                         \
+        typename R,                                                         \
+        typename = typename std::enable_if<is_expr<L> || is_expr<R>>::type> \
+    auto operator op(L lhs, R rhs) {                                        \
+        return class_name<expr_type<L>, expr_type<R>>(                      \
+            expr(std::move(lhs)),                                           \
+            expr(std::move(rhs)));                                          \
     }
 
-BINARY_OP_IMPL(MulOp, *)
-BINARY_OP_IMPL(AddOp, +)
-BINARY_OP_IMPL(SubdOp, -)
-BINARY_OP_IMPL(DivOp, /)
-BINARY_OP_IMPL(RemOp, %)
-BINARY_OP_IMPL(OrOp, |)
-BINARY_OP_IMPL(AndOp, &)
-BINARY_OP_IMPL(XorOp, ^)
-BINARY_OP_IMPL(EqOp, ==)
-BINARY_OP_IMPL(NeqOp, !=)
-BINARY_OP_IMPL(LeOp, <)
-BINARY_OP_IMPL(GtOp, >)
-BINARY_OP_IMPL(LteOp, <=)
-BINARY_OP_IMPL(GteOp, >=)
+BINARY_OP_IMPL(AddExpr, std::plus<void> {}, +)
+BINARY_OP_IMPL(MulExpr, std::multiplies<void> {}, *)
+BINARY_OP_IMPL(SubExpr, std::minus<void> {}, -)
+BINARY_OP_IMPL(DivExpr, std::divides<void> {}, /)
+BINARY_OP_IMPL(ModExpr, std::modulus<void> {}, %)
+
+BINARY_OP_IMPL(OrExpr, std::bit_or<void> {}, |)
+BINARY_OP_IMPL(AndExpr, std::bit_and<void> {}, &)
+BINARY_OP_IMPL(XorExpr, std::bit_xor<void> {}, ^)
+
+BINARY_OP_IMPL(EqExpr, std::equal_to<void> {}, ==)
+BINARY_OP_IMPL(NeqExpr, std::not_equal_to<void> {}, !=)
+BINARY_OP_IMPL(LtExpr, std::less<void> {}, <)
+BINARY_OP_IMPL(GtExpr, std::greater<void> {}, >)
+BINARY_OP_IMPL(LteExpr, std::less_equal<void> {}, <=)
+BINARY_OP_IMPL(GteExpr, std::greater_equal<void> {}, >=)
 
 // This are rarely used and they cause a lot of confusion when expressions
 // are used in ostreams/istreams.
 // BINARY_OP_IMPL(ShlOp, <<)
 // BINARY_OP_IMPL(ShrOp, >>)
 #undef BINARY_OP_IMPL
-
-template<typename L>
-struct AccessorOp {
-    AccessorOp(L list) : _inner(std::move(list)) {
-        //
-    }
-
-    template<typename I>
-    auto eval(I index) const {
-        return _inner.at(index);
-    }
-
-    std::string name(const std::string& index) const {
-        std::stringstream oss;
-        oss << "{";
-        bool is_first = true;
-
-        for (const auto& it : _inner) {
-            if (!is_first) {
-                oss << ", ";
-            } else {
-                is_first = false;
-            }
-
-            oss << it;
-        }
-
-        oss << "}[" << index << "]";
-        return oss.str();
-    }
-
-  private:
-    L _inner;
-};
-
-template<typename T, typename I>
-auto get(const std::initializer_list<T>& list, I index) {
-    std::vector<T> v = list;
-    return get(std::move(v), index);
-}
-
-template<typename L, typename I>
-auto get(L list, I index) {
-    return make_op(AccessorOp<L> {std::move(list)}, expr(std::move(index)));
-}
 
 namespace detail {
     template<typename A, typename B, typename = void>
@@ -402,46 +335,101 @@ namespace detail {
     };
 }  // namespace detail
 
-template<typename T>
-struct CastOp {
-    template<typename I>
-    T eval(I value) const {
-        return detail::CastHelper<I, T>::call(std::move(value));
+template<typename E, typename O, typename I = typename E::return_type>
+struct ConvertExpr: BaseExpr<O> {
+    ConvertExpr(E value) : _inner(std::move(value)) {
+        //
     }
 
-    std::string name(const std::string& name) const {
-        return name;
+    std::string to_string() const override {
+        return _inner.to_string();
     }
+
+    O eval(const Eval& eval) const override {
+        return detail::CastHelper<I, O>::call(eval(_inner));
+    }
+
+    nlohmann::json to_json() const override {
+        return {
+            {"operator", "convert"},
+            {"type", type_of<O>().name()},
+            {"operand", _inner.to_json()},
+        };
+    }
+
+  private:
+    E _inner;
 };
 
-template<typename T, typename E>
+template<typename E, typename I>
+struct ConvertExpr<E, I, I>: BaseExpr<I> {
+    ConvertExpr(E value) : _inner(std::move(value)) {
+        //
+    }
+
+    std::string to_string() const override {
+        return _inner.to_string();
+    }
+
+    I eval(const Eval& eval) const override {
+        return eval(_inner);
+    }
+
+    nlohmann::json to_json() const override {
+        return _inner.to_json();
+    }
+
+  private:
+    E _inner;
+};
+
+template<typename O, typename E>
 auto cast(E val) {
-    return make_op(CastOp<T> {}, expr(std::move(val)));
+    return ConvertExpr<expr_type<E>, O>(expr(std::move(val)));
 }
 
-struct TernaryOp {
-    template<typename L, typename R>
-    auto eval(bool cond, L left, R right) const {
-        return cond ? std::move(left) : std::move(right);
+template<
+    typename C,
+    typename L,
+    typename R,
+    typename O = typename std::
+        common_type<typename L::return_type, typename R::return_type>::type>
+struct CondExpr: BaseExpr<O> {
+    CondExpr(C cond, L left, R right) :
+        _cond(std::move(cond)),
+        _left(std::move(left)),
+        _right(std::move(right)) {}
+
+    std::string to_string() const override {
+        return "(" + _cond.to_string() + " ? " + _left.to_string() + " : "
+            + _right.to_string() + ")";
     }
 
-    std::string name(
-        const std::string& cond,
-        const std::string& left,
-        const std::string& right) const {
-        std::stringstream oss;
-        oss << "(" << cond << " ? " << left << " : " << right << ")";
-        return oss.str();
+    O eval(const Eval& eval) const override {
+        return eval(_cond) ? eval(_left) : eval(_right);
     }
+
+    nlohmann::json to_json() const override {
+        return {
+            {"operator", "conditional"},
+            {"condition", _cond.to_json()},
+            {"left", _left.to_json()},
+            {"right", _right.to_json()},
+        };
+    }
+
+  private:
+    C _cond;
+    L _left;
+    R _right;
 };
 
 template<typename C, typename L, typename R>
 auto ifelse(C cond, L left, R right) {
-    return make_op(
-        TernaryOp {},
+    return CondExpr<expr_type<C>, expr_type<L>, expr_type<R>> {
         expr(std::move(cond)),
         expr(std::move(left)),
-        expr(std::move(right)));
+        expr(std::move(right))};
 }
 
 template<typename A, typename B>
@@ -461,8 +449,12 @@ struct Expr: BaseExpr<T> {
         return _inner->eval(eval);
     }
 
-    std::string name() const override {
-        return _inner->name();
+    std::string to_string() const override {
+        return _inner->to_string();
+    }
+
+    nlohmann::json to_json() const override {
+        return _inner->to_json();
     }
 
   private:

@@ -180,7 +180,7 @@ struct ConfigSpace {
         for (const auto& r : _restrictions) {
             if (!eval(r)) {
                 throw std::runtime_error(
-                    "config does not pass restriction: " + r.name());
+                    "config does not pass restriction: " + r.to_string());
             }
         }
 
@@ -206,7 +206,7 @@ struct ConfigSpace {
 
         std::vector<json> restrictions;
         for (const auto& d : _restrictions) {
-            restrictions.push_back(d.name());
+            restrictions.push_back(d.to_json());
         }
         results["restrictions"] = restrictions;
 

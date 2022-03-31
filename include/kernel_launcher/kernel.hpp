@@ -53,8 +53,8 @@ struct KernelBuilder: ConfigSpace {
 
     KernelBuilder& block_size(
         Expr<uint32_t> x,
-        Expr<uint32_t> y = {1},
-        Expr<uint32_t> z = {1}) {
+        Expr<uint32_t> y = {1u},
+        Expr<uint32_t> z = {1u}) {
         grid_divisors(x, y, z);
         _block_size[0] = std::move(x);
         _block_size[1] = std::move(y);
@@ -64,8 +64,8 @@ struct KernelBuilder: ConfigSpace {
 
     std::array<Expr<uint32_t>, 3> tune_block_size(
         std::vector<uint32_t> xs,
-        std::vector<uint32_t> ys = {1},
-        std::vector<uint32_t> zs = {1}) {
+        std::vector<uint32_t> ys = {1u},
+        std::vector<uint32_t> zs = {1u}) {
         Expr<uint32_t> x = tune("block_size_x", std::move(xs));
         Expr<uint32_t> y = tune("block_size_y", std::move(ys));
         Expr<uint32_t> z = tune("block_size_z", std::move(zs));
@@ -75,8 +75,8 @@ struct KernelBuilder: ConfigSpace {
 
     KernelBuilder& grid_divisors(
         Expr<uint32_t> x,
-        Expr<uint32_t> y = {1},
-        Expr<uint32_t> z = {1}) {
+        Expr<uint32_t> y = {1u},
+        Expr<uint32_t> z = {1u}) {
         _grid_divisors[0] = std::move(x);
         _grid_divisors[1] = std::move(y);
         _grid_divisors[2] = std::move(z);
@@ -165,7 +165,7 @@ struct KernelBuilder: ConfigSpace {
 
         for (const auto& p : _assertions) {
             if (!eval(p)) {
-                throw std::runtime_error("assertion failed: " + p.name());
+                throw std::runtime_error("assertion failed: " + p.to_string());
             }
         }
 
@@ -224,20 +224,20 @@ struct KernelBuilder: ConfigSpace {
             _block_size[1].to_json(),
             _block_size[2].to_json()};
         result["grid_divisors"] = {
-            _grid_divisors[0].name(),
-            _grid_divisors[1].name(),
-            _grid_divisors[2].name()};
+            _grid_divisors[0].to_json(),
+            _grid_divisors[1].to_json(),
+            _grid_divisors[2].to_json()};
         result["shared_mem"] = _shared_mem.to_json();
 
         std::vector<json> template_args;
         for (const auto& p : _template_args) {
-            template_args.push_back(p.name());
+            template_args.push_back(p.to_json());
         }
         result["template_arg"] = template_args;
 
         std::vector<json> compile_flags;
         for (const auto& p : _compile_flags) {
-            compile_flags.push_back(p.name());
+            compile_flags.push_back(p.to_json());
         }
         result["compile_flags"] = compile_flags;
 
@@ -252,9 +252,9 @@ struct KernelBuilder: ConfigSpace {
 
     Source _kernel_source;
     std::string _kernel_name;
-    std::array<Expr<uint32_t>, 3> _block_size = {1, 1, 1};
-    std::array<Expr<uint32_t>, 3> _grid_divisors = {1, 1, 1};
-    Expr<uint32_t> _shared_mem = {0};
+    std::array<Expr<uint32_t>, 3> _block_size = {1u, 1u, 1u};
+    std::array<Expr<uint32_t>, 3> _grid_divisors = {1u, 1u, 1u};
+    Expr<uint32_t> _shared_mem = {0u};
     std::vector<Expr<TemplateArg>> _template_args {};
     std::vector<Expr<std::string>> _compile_flags {};
     std::vector<Expr<bool>> _assertions {};
