@@ -25,7 +25,8 @@
  * The kernel computes C=A*B, where A, B, and C are square
  * matrices with height and width equal to WIDTH
  */
-__global__ void matmul_kernel(float *C, float *A, float *B) {
+template <typename TF>
+__global__ void matmul_kernel(TF *C, const TF *A, const TF *B) {
 
     __shared__ float sA[block_size_y*tile_size_y][block_size_x];
     __shared__ float sB[block_size_y*tile_size_y][block_size_x * tile_size_x];
@@ -85,7 +86,3 @@ __global__ void matmul_kernel(float *C, float *A, float *B) {
     }
 
 }
-
-
-
-

@@ -1,7 +1,15 @@
-CFLAGS=-std=c++11 -g -Wall -Wextra -I../../include -I../../thirdparty/nlohmann/json/single_include
+CC=g++
+CFLAGS=-std=c++14 -I../../thirdparty -I../../include -g -O2 -Wall -Wextra -pedantic
+LIBS=-lcuda -lcudart -lnvrtc
 
-example: example.cpp ../../include/kernel_launcher.h
-	g++ example.cpp -o example $(CFLAGS) -lnvrtc -lcuda -lcudart
+BIN=main
+
+all: $(BIN)
+
+$(BIN): main.cpp vector_add.cu
+	$(CC) $< -o $@ $(CFLAGS) $(LIBS)
 
 clean:
-	rm example
+	rm -f $(BIN)
+
+.PHONY: clean fmt
