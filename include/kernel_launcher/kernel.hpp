@@ -203,8 +203,7 @@ struct KernelBuilder: ConfigSpace {
                                     template_args,
                                     parameter_types,
                                     options,
-                                    nullptr,
-                                    block_size)
+                                    nullptr)
                                 .get();
 
         return RawKernel(

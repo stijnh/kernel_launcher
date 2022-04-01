@@ -56,12 +56,9 @@ struct CudaModule {
         return *this;
     }
 
-    CudaModule(
-        const char* image,
-        const char* symbol,
-        unsigned int num_threads) {
-        CUjit_option options[1] = {CU_JIT_THREADS_PER_BLOCK};
-        void* values[1] = {&num_threads};
+    CudaModule(const char* image, const char* symbol) {
+        CUjit_option options[0] = {};
+        void* values[0] = {};
 
         cu_assert(cuModuleLoadDataEx(&_module, image, 0, options, values));
         cu_assert(cuModuleGetFunction(&_function, _module, symbol));

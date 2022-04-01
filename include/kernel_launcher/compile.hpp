@@ -52,8 +52,7 @@ struct Compiler {
         const std::vector<TemplateArg>& template_args,
         const std::vector<Type>& parameter_types,
         const std::vector<std::string>& options,
-        CUdevice* device_opt,
-        dim3 block_size) const = 0;
+        CUdevice* device_opt) const = 0;
 };
 
 struct NvrtcException: std::runtime_error {
@@ -163,8 +162,7 @@ struct NvrtcCompiler: Compiler {
         const std::vector<TemplateArg>& template_args,
         const std::vector<Type>& parameter_types,
         const std::vector<std::string>& options,
-        CUdevice* device_opt,
-        dim3 block_size) const override {
+        CUdevice* device_opt) const override {
         std::string symbol =
             generate_expression(kernel_name, template_args, parameter_types);
 
@@ -229,10 +227,7 @@ struct NvrtcCompiler: Compiler {
             std::vector<char> ptx(size + 1, '\0');
             nvrtc_assert(nvrtcGetPTX(program, ptx.data()));
 
-            unsigned int num_threads =
-                block_size.x * block_size.y * block_size.z;
-            CudaModule module =
-                CudaModule(ptx.data(), lowered_name, num_threads);
+            CudaModule module = CudaModule(ptx.data(), lowered_name);
 
             nvrtc_assert(nvrtcDestroyProgram(&program));
 
