@@ -1,9 +1,9 @@
 #include "kernel_launcher/config.hpp"
-#include "../include/kernel_launcher/config.hpp"
-
 
 #include <random>
 #include <unordered_set>
+
+#include "../include/kernel_launcher/config.hpp"
 
 namespace kernel_launcher {
 

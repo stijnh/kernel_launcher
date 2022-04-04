@@ -9,7 +9,6 @@
  * 
  */
 
-#define WIDTH 4096
 /*
  * Optimized CUDA kernel for matrix multiplication
  *
@@ -25,8 +24,21 @@
  * The kernel computes C=A*B, where A, B, and C are square
  * matrices with height and width equal to WIDTH
  */
-template <typename TF>
-__global__ void matmul_kernel(TF *C, const TF *A, const TF *B) {
+template <
+        typename TF,
+        int WIDTH,
+        int block_size_x,
+        int block_size_y,
+        int tile_size_x,
+        int tile_size_y,
+        int blocks_per_sm
+>
+__global__ void
+__launch_bounds__(block_size_x * block_size_y, blocks_per_sm)
+matmul_kernel(TF *C, const TF *A, const TF *B) {
+    static_assert(WIDTH % (tile_size_x * block_size_x) == 0, "invalid parameters");
+    static_assert(WIDTH % (tile_size_y * block_size_y) == 0, "invalid parameters");
+    static_assert(block_size_x == block_size_y * tile_size_y, "invalid parameters");
 
     __shared__ float sA[block_size_y*tile_size_y][block_size_x];
     __shared__ float sB[block_size_y*tile_size_y][block_size_x * tile_size_x];

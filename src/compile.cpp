@@ -1,5 +1,7 @@
 #include "kernel_launcher/compile.hpp"
 
+#include "../include/kernel_launcher/compile.hpp"
+
 namespace kernel_launcher {
 
 static inline std::string generate_expression(
@@ -23,7 +25,7 @@ static inline std::string generate_expression(
     oss << "))";
     oss << kernel_name;
 
-    if (template_args.size() > 0) {
+    if (!template_args.empty()) {
         oss << "<";
 
         is_first = true;

@@ -10,21 +10,8 @@
 
 namespace kernel_launcher {
 
-static inline std::string cu_error_message(CUresult err) {
-    const char* name = "???";
-    const char* description = "???";
-    cuGetErrorName(err, &name);
-    cuGetErrorString(err, &description);
-
-    char buf[1024];
-    snprintf(buf, sizeof buf, "CUDA error: %s (%s)", name, description);
-    return buf;
-}
-
 struct CuException: std::runtime_error {
-    CuException(CUresult err) :
-        std::runtime_error(cu_error_message(err)),
-        _err(err) {}
+    explicit CuException(CUresult err);
 
     CUresult error() const {
         return _err;
@@ -232,8 +219,8 @@ struct MemoryView {
         return _size * sizeof(T);
     }
 
-    MemoryView<T> slice(size_t start, size_t len) {
-        if (start + len >= _size) {
+    MemoryView<T> slice(size_t start, size_t len) const {
+        if (start + len >= _size) {  // TODO check overflow
             throw std::runtime_error("index out of bounds");
         }
 
@@ -291,7 +278,7 @@ struct Memory: MemoryView<T> {
     }
 
     MemoryView<T> view() const {
-        return MemoryView<const T>(this->_device_ptr, this->_size);
+        return MemoryView<T>(this->_device_ptr, this->_size);
     }
 };
 
