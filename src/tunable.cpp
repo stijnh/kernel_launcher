@@ -1,6 +1,10 @@
 #include "kernel_launcher/tunable.hpp"
 
+#include <unistd.h>
+
 namespace kernel_launcher {
+
+using nlohmann::json;
 
 bool RandomStrategy::init(const KernelBuilder& builder, Config& config) {
     _iter = builder.iterate();
@@ -11,58 +15,239 @@ bool RandomStrategy::submit(double, Config& config) {
     return _iter.next(config);
 }
 
-bool CachingStrategy::read_cache(
+static std::string current_date() {
+    using std::chrono::system_clock;
+    std::time_t t = system_clock::to_time_t(system_clock::now());
+    std::stringstream oss;
+    oss << std::put_time(std::localtime(&t), "%FT%T%z");
+    return oss.str();
+}
+
+static std::string current_device_name() {
+    char name[1024] = {0};
+    CUdevice device;
+    KERNEL_LAUNCHER_ASSERT(cuCtxGetDevice(&device));
+    KERNEL_LAUNCHER_ASSERT(cuDeviceGetName(name, sizeof name, device));
+    return name;
+}
+
+#define HEADER_MAGIC   ("kernel_launcher")
+#define HEADER_VERSION ("0.1")
+
+static json create_header(
+    const KernelBuilder& builder,
+    const std::vector<TunableParam>& params) {
+    std::vector<json> parameters;
+    for (const auto& param : params) {
+        std::vector<json> values;
+
+        for (const auto& val : builder.parameters().at(param)) {
+            values.push_back(val.to_json());
+        }
+
+        parameters.push_back(
+            {{"name", param.name()},
+             {"type", param.type().name()},
+             {"values", values}});
+    }
+
+    std::sort(parameters.begin(), parameters.end(), [&](auto a, auto b) {
+        return a < b;
+    });
+
+    char hostname[1024] = {0};
+    gethostname(hostname, sizeof hostname);
+
+    int cuda_driver_version;
+    KERNEL_LAUNCHER_ASSERT(cuDriverGetVersion(&cuda_driver_version));
+
+    return {
+        {"parameters", parameters},
+        {"device", current_device_name()},
+        {"kernel_name", builder.kernel_name()},
+        {"kernel_source", builder.kernel_source().file_name()},
+        {"date", current_date()},
+        {"version", HEADER_VERSION},
+        {"magic", HEADER_MAGIC},
+        {"cuda_driver", cuda_driver_version},
+        {"hostname", hostname}};
+}
+
+static void assert_header_correct(
+    const std::string& filename,
+    const KernelBuilder& builder,
+    const std::vector<TunableParam>& params,
+    const json& header) {
+    if (header["magic"] != HEADER_MAGIC) {
+        throw std::runtime_error(
+            "error while opening " + filename
+            + ": invalid file format or file has been corrupted");
+    }
+
+    if (header["version"] != HEADER_VERSION) {
+        throw std::runtime_error(
+            "error while opening " + filename + ": invalid version number");
+    }
+
+    {
+        std::string gotten = header["kernel_name"];
+        std::string expected = builder.kernel_name();
+        if (expected != gotten) {
+            throw std::runtime_error(
+                "error while opening " + filename
+                + ": results have been tuned for kernel '" + expected
+                + "', but current kernel is '" + expected + "'");
+        }
+    }
+
+    {
+        std::string gotten = header["device"];
+        std::string expected = current_device_name();
+        if (expected != gotten) {
+            throw std::runtime_error(
+                "error while opening " + filename
+                + ": results have been tuned for device '" + expected
+                + "', but current device is '" + expected + "'");
+        }
+    }
+
+    bool parameters_valid = true;
+
+    if (params.size() == header["parameters"].size()) {
+        size_t i = 0;
+
+        for (const auto& p : header["parameters"]) {
+            parameters_valid &= p["name"] == params[i++].name();
+        }
+    } else {
+        parameters_valid = false;
+    }
+
+    if (!parameters_valid) {
+        throw std::runtime_error(
+            "error while opening " + filename
+            + ": results have been tuned for different parameters");
+    }
+}
+
+bool TuningCache::initialize(
     const KernelBuilder& builder,
     Config& best_config) {
-    using nlohmann::json;
-    json content;
+    _initialized = true;
+    _parameters.clear();
+    _cache.clear();
+
+    for (const auto& p : builder.parameters()) {
+        _parameters.push_back(p.first);
+    }
+
+    std::sort(_parameters.begin(), _parameters.end(), [](auto a, auto b) {
+        return a.name() < b.name();
+    });
 
     std::ifstream stream(_filename.c_str());
 
-    if (stream) {
-        content = json::parse(stream);
-    } else {
-        std::cout << "warning: failed to read: " << _filename << std::endl;
-        content = json::object({
-            {"kernel", builder.to_json()},
-            {"cache", json::array()},
-        });
+    if (!stream) {
+        std::ofstream ostream(_filename.c_str());
+        ostream << create_header(builder, _parameters);
+        return false;
     }
 
-    _cache.clear();
-    double best_performance = 1e99;
-    bool found_config = false;
+    bool seen_header = false;
+    json best_record;
+    double best_performance = -std::numeric_limits<double>::infinity();
 
-    for (const auto& p : content["cache"]) {
-        double performance = p["performance"];
-        json config = p["config"];
+    for (std::string line; getline(stream, line);) {
+        // line.trim(); // TODO: maybe trim string?
+        if (line.empty())
+            continue;
 
-        if (performance < best_performance) {
-            best_performance = performance;
-            best_config = builder.load_config(config);
-            found_config = true;
+        json record = json::parse(line);
+
+        if (!seen_header) {
+            seen_header = true;
+            assert_header_correct(_filename, builder, _parameters, record);
+            continue;
         }
 
-        _cache[config.dump()] = performance;
+        double performance = record["performance"];
+        _cache[record["key"]] = performance;
+
+        if (performance > best_performance) {
+            best_record = record;
+            best_performance = performance;
+        }
     }
 
-    _json = std::move(content);
-    return found_config;
+    if (!best_record.is_null()) {
+        best_config = builder.load_config(best_record["config"]);
+        return true;
+    } else {
+        return false;
+    }
 }
 
-void CachingStrategy::write_cache(const Config& config, double performance) {
-    using nlohmann::json;
-    json record;
-    record["config"] = config.to_json();
-    record["performance"] = performance;
+static std::string
+config_to_key(const Config& config, const std::vector<TunableParam>& params) {
+    std::stringstream output;
+    bool is_first = true;
 
-    _json["cache"].push_back(std::move(record));
-    std::string output = _json.dump(4);
+    for (const auto& p : params) {
+        if (is_first) {
+            is_first = false;
+        } else {
+            output << "|";
+        }
 
-    std::ofstream stream(
-        _filename.c_str(),
-        std::ofstream::trunc | std::ofstream::out);
-    stream << output;
+        output << config[p].to_string();
+    }
+
+    return output.str();
+}
+
+void TuningCache::append(const Config& config, double performance) {
+    KERNEL_LAUNCHER_ASSERT(_initialized);
+    std::string key = config_to_key(config, _parameters);
+    _cache[key] = performance;
+
+    json record = {
+        {"key", std::move(key)},
+        {"config", config.to_json()},
+        {"date", current_date()},
+        {"performance", performance}};
+
+    // TODO: Maybe check if file has changed in the meantime somehow?
+    std::ofstream stream(_filename, std::ofstream::app);
+    stream << "\n" << record;
+}
+
+bool TuningCache::find(const Config& config, double& answer) const {
+    std::string key = config_to_key(config, _parameters);
+    auto it = _cache.find(key);
+
+    if (it == _cache.end()) {
+        return false;
+    }
+
+    answer = it->second;
+    return true;
+}
+
+static bool internal_submit(
+    const TuningCache& cache,
+    TuningStrategy& inner,
+    Config& config) {
+    double perf;
+
+    while (true) {
+        if (!cache.find(config, perf)) {
+            return true;
+        }
+
+        if (!inner.submit(perf, config)) {
+            return false;
+        }
+    }
 }
 
 bool CachingStrategy::init(const KernelBuilder& builder, Config& config) {
@@ -71,15 +256,16 @@ bool CachingStrategy::init(const KernelBuilder& builder, Config& config) {
     }
 
     Config best_config;
-    if (read_cache(builder, best_config)) {
+    if (_cache.initialize(builder, best_config)) {
         _first_run = true;
         _first_config = std::move(config);
         config = std::move(best_config);
-        _current = config.to_json().dump();
         return true;
+    } else {
+        _first_run = false;
     }
 
-    return submit_internal(config);
+    return internal_submit(_cache, *_inner, config);
 }
 
 bool CachingStrategy::submit(double performance, Config& config) {
@@ -87,30 +273,14 @@ bool CachingStrategy::submit(double performance, Config& config) {
         _first_run = false;
         config = std::move(_first_config);
     } else {
-        _cache[_current] = performance;
-        write_cache(config, performance);
-    }
+        _cache.append(config, 1 / performance);
 
-    if (!_inner->submit(performance, config)) {
-        return false;
-    }
-
-    return submit_internal(config);
-}
-
-bool CachingStrategy::submit_internal(Config& config) {
-    while (true) {
-        _current = config.to_json().dump();
-
-        auto it = _cache.find(_current);
-        if (it == _cache.end()) {
-            return true;
-        }
-
-        if (!_inner->submit(it->second, config)) {
+        if (!_inner->submit(performance, config)) {
             return false;
         }
     }
+
+    return internal_submit(_cache, *_inner, config);
 }
 
 void RawTuneKernel::launch(
@@ -119,9 +289,9 @@ void RawTuneKernel::launch(
     void** args) {
     if (_state == state_tuning) {
         _after_event.synchronize();
-        _current_time += _after_event.elapsed_since(_before_event);
+        _current_time += _after_event.seconds_elapsed_since(_before_event);
 
-        if (_current_time > 1000.0) {
+        if (_current_time > 1.0) {
             next_configuration();
         }
     }

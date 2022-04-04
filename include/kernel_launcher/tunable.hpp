@@ -19,11 +19,27 @@ struct RandomStrategy: TuningStrategy {
     ConfigIterator _iter;
 };
 
+struct TuningCache {
+    TuningCache(std::string filename) : _filename(std::move(filename)) {
+        //
+    }
+
+    bool initialize(const KernelBuilder& builder, Config& best_config);
+    void append(const Config& config, double performance);
+    bool find(const Config& config, double& performance) const;
+
+  private:
+    bool _initialized = false;
+    std::string _filename;
+    std::unordered_map<std::string, double> _cache {};
+    std::vector<TunableParam> _parameters {};
+};
+
 struct CachingStrategy: TuningStrategy {
     template<typename T>
     CachingStrategy(std::string filename, T inner = {}) :
         _inner(std::make_unique<std::decay_t<T>>(std::forward<T>(inner))),
-        _filename(std::move(filename)) {
+        _cache(std::move(filename)) {
         //
     }
 
@@ -31,18 +47,10 @@ struct CachingStrategy: TuningStrategy {
     bool submit(double performance, Config& config) override;
 
   private:
-    bool read_cache(const KernelBuilder& builder, Config& best_config);
-    void write_cache(const Config& config, double performance);
-    bool submit_internal(Config& config);
-
-  private:
     std::unique_ptr<TuningStrategy> _inner;
-    std::string _filename;
-    nlohmann::json _json;
+    TuningCache _cache;
     bool _first_run;
     Config _first_config;
-    std::string _current;
-    std::unordered_map<std::string, double> _cache;
 };
 
 struct RawTuneKernel {

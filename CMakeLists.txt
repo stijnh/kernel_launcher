@@ -12,8 +12,9 @@ add_compile_options(-Wall -Wextra -pedantic)
 find_package(Threads REQUIRED)
 link_libraries(kernel_launcher Threads::Threads)
 
-find_package(CUDA REQUIRED)
-link_libraries(kernel_launcher ${CUDA_CUDART_LIBRARY} ${CUDA_CUDA_LIBRARY})
+#find_package(CUDA REQUIRED)
+#link_libraries(kernel_launcher ${CUDA_CUDART_LIBRARY} ${CUDA_CUDA_LIBRARY})
+link_libraries(kernel_launcher cuda cudart)
 link_libraries(kernel_launcher nvrtc)  # Not offered by CUDA package?
 
 add_subdirectory(examples)

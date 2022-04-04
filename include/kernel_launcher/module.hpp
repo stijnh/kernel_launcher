@@ -11,7 +11,11 @@
 namespace kernel_launcher {
 
 struct CuException: std::runtime_error {
-    explicit CuException(CUresult err);
+    CuException(
+        CUresult err,
+        const char* expression,
+        const char* filename,
+        int line);
 
     CUresult error() const {
         return _err;
@@ -21,12 +25,21 @@ struct CuException: std::runtime_error {
     CUresult _err;
 };
 
-#define cu_assert(expr) cu_assert_(expr, #expr)
+#define KERNEL_LAUNCHER_ASSERT(expr) \
+    ::kernel_launcher::assert_(expr, #expr, __FILE__, __LINE__)
 
-static inline void cu_assert_(CUresult err, const char* s) {
+static inline void
+assert_(CUresult err, const char* expression, const char* filename, int line) {
     if (err != CUDA_SUCCESS) {
-        std::cout << "FAILED: " << s << std::endl;
-        throw CuException(err);
+        throw CuException(err, expression, filename, line);
+    }
+}
+
+static inline void
+assert_(bool cond, const char* expression, const char* filename, int line) {
+    if (!cond) {
+        throw std::runtime_error(
+            std::string("assertion failed: ") + expression);
     }
 }
 
@@ -46,8 +59,10 @@ struct CudaModule {
     }
 
     CudaModule(const char* image, const char* symbol) {
-        cu_assert(cuModuleLoadDataEx(&_module, image, 0, nullptr, nullptr));
-        cu_assert(cuModuleGetFunction(&_function, _module, symbol));
+        KERNEL_LAUNCHER_ASSERT(
+            cuModuleLoadDataEx(&_module, image, 0, nullptr, nullptr));
+        KERNEL_LAUNCHER_ASSERT(
+            cuModuleGetFunction(&_function, _module, symbol));
     }
 
     bool valid() const {
@@ -60,7 +75,7 @@ struct CudaModule {
         unsigned int shared_mem,
         CUstream stream,
         void** args) const {
-        cu_assert(cuLaunchKernel(
+        KERNEL_LAUNCHER_ASSERT(cuLaunchKernel(
             _function,
             grid.x,
             grid.y,
@@ -102,7 +117,7 @@ struct CudaEvent {
     }
 
     CudaEvent(unsigned int flags = CU_EVENT_DEFAULT) {
-        cu_assert(cuEventCreate(&_event, flags));
+        KERNEL_LAUNCHER_ASSERT(cuEventCreate(&_event, flags));
     }
 
     CUevent get() const {
@@ -114,23 +129,23 @@ struct CudaEvent {
     }
 
     void synchronize() const {
-        cu_assert(cuEventSynchronize(_event));
+        KERNEL_LAUNCHER_ASSERT(cuEventSynchronize(_event));
     }
 
     void record(CUstream stream) const {
-        cu_assert(cuEventRecord(_event, stream));
+        KERNEL_LAUNCHER_ASSERT(cuEventRecord(_event, stream));
     }
 
-    float elapsed_since(CUevent before) const {
+    float seconds_elapsed_since(CUevent before) const {
         float time = 1337;
-        cu_assert(cuEventElapsedTime(&time, before, _event));
-        return time;
+        KERNEL_LAUNCHER_ASSERT(cuEventElapsedTime(&time, before, _event));
+        return time / 1000;  // milliseconds to seconds
     }
 
     ~CudaEvent() {
         if (_event) {
-            cu_assert(cuEventSynchronize(_event));
-            cu_assert(cuEventDestroy(_event));
+            KERNEL_LAUNCHER_ASSERT(cuEventSynchronize(_event));
+            KERNEL_LAUNCHER_ASSERT(cuEventDestroy(_event));
             _event = nullptr;
         }
     }
@@ -171,7 +186,7 @@ struct MemoryView {
             throw std::runtime_error("size mismatch");
         }
 
-        cu_assert(cuMemcpy(
+        KERNEL_LAUNCHER_ASSERT(cuMemcpy(
             (CUdeviceptr)m._device_ptr,
             (CUdeviceptr)this->_device_ptr,
             this->size_in_bytes()));
@@ -263,7 +278,7 @@ struct Memory: MemoryView<T> {
         free();
 
         if (n > 0) {
-            cu_assert(
+            KERNEL_LAUNCHER_ASSERT(
                 cuMemAlloc((CUdeviceptr*)&(this->_device_ptr), n * sizeof(T)));
             this->_size = n;
         }
@@ -271,7 +286,7 @@ struct Memory: MemoryView<T> {
 
     void free() {
         if (this->_device_ptr) {
-            cu_assert(cuMemFree((CUdeviceptr)this->_device_ptr));
+            KERNEL_LAUNCHER_ASSERT(cuMemFree((CUdeviceptr)this->_device_ptr));
             this->_device_ptr = nullptr;
             this->_size = 0;
         }

@@ -4,6 +4,12 @@
 
 namespace kernel_launcher {
 
+static inline void nvrtc_assert(nvrtcResult err) {
+    if (err != NVRTC_SUCCESS) {
+        throw NvrtcException(err);
+    }
+}
+
 static inline std::string generate_expression(
     const std::string& kernel_name,
     const std::vector<TemplateArg>& template_args,
@@ -50,15 +56,15 @@ static inline std::string arch_flag(CUdevice* device_opt) {
     if (device_opt) {
         device = *device_opt;
     } else {
-        cu_assert(cuCtxGetDevice(&device));
+        KERNEL_LAUNCHER_ASSERT(cuCtxGetDevice(&device));
     }
 
     int major, minor;
-    cu_assert(cuDeviceGetAttribute(
+    KERNEL_LAUNCHER_ASSERT(cuDeviceGetAttribute(
         &minor,
         CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
         device));
-    cu_assert(cuDeviceGetAttribute(
+    KERNEL_LAUNCHER_ASSERT(cuDeviceGetAttribute(
         &major,
         CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
         device));
@@ -159,18 +165,11 @@ std::future<CudaModule> AsyncCompiler::compile(
     const std::vector<Type>& parameter_types,
     const std::vector<std::string>& options,
     CUdevice* device_opt) const {
-    CUdevice device;
-    if (device_opt) {
-        device = *device_opt;
-    } else {
-        cu_assert(cuCtxGetDevice(&device));
-    }
+    CUcontext context;
+    KERNEL_LAUNCHER_ASSERT(cuCtxGetCurrent(&context));
 
     auto out = std::async(std::launch::async, [=]() {
-        CUdevice d = device;
-        CUcontext context;
-        cu_assert(cuDevicePrimaryCtxRetain(&context, device));
-        cu_assert(cuCtxSetCurrent(context));
+        KERNEL_LAUNCHER_ASSERT(cuCtxSetCurrent(context));
 
         return _inner
             ->compile(
@@ -179,7 +178,7 @@ std::future<CudaModule> AsyncCompiler::compile(
                 template_args,
                 parameter_types,
                 options,
-                &d)
+                nullptr)
             .get();
     });
     return out;

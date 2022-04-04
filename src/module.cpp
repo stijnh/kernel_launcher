@@ -2,19 +2,36 @@
 
 namespace kernel_launcher {
 
-static std::string cu_error_message(CUresult err) {
+static std::string cu_error_message(
+    CUresult err,
+    const char* expression,
+    const char* filename,
+    int line) {
     const char* name = "???";
     const char* description = "???";
     cuGetErrorName(err, &name);
     cuGetErrorString(err, &description);
 
     char buf[1024];
-    snprintf(buf, sizeof buf, "CUDA error: %s (%s)", name, description);
+    snprintf(
+        buf,
+        sizeof buf,
+        "CUDA error: %s (%s) at %s:%d (%s)",
+        name,
+        description,
+        filename,
+        line,
+        expression);
+
     return buf;
 }
 
-CuException::CuException(CUresult err) :
-    std::runtime_error(cu_error_message(err)),
+CuException::CuException(
+    CUresult err,
+    const char* message,
+    const char* filename,
+    int line) :
+    std::runtime_error(cu_error_message(err, message, filename, line)),
     _err(err) {};
 
 }  // namespace kernel_launcher

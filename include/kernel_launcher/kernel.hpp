@@ -45,6 +45,14 @@ struct KernelBuilder: ConfigSpace {
         //
     }
 
+    const std::string& kernel_name() const {
+        return _kernel_name;
+    }
+
+    const Source& kernel_source() const {
+        return _kernel_source;
+    }
+
     template<typename T>
     KernelBuilder& template_type() {
         return template_arg(Type::of<T>());

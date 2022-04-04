@@ -73,12 +73,6 @@ struct NvrtcException: std::runtime_error {
     nvrtcResult _err;
 };
 
-static inline void nvrtc_assert(nvrtcResult err) {
-    if (err != NVRTC_SUCCESS) {
-        throw NvrtcException(err);
-    }
-}
-
 struct Compiler {
     virtual std::future<CudaModule> compile(
         const Source& kernel_source,
