@@ -8,39 +8,9 @@
 #include <string>
 #include <typeindex>
 #include <unordered_map>
+#include <vector>
 
 namespace kernel_launcher {
-
-const std::string& demangle_type_info(const std::type_info& type) {
-    static std::mutex lock = {};
-    static std::unordered_map<std::type_index, std::string> demangled_names =
-        {};
-
-    std::lock_guard<std::mutex> guard(lock);
-    auto it = demangled_names.find(type);
-
-    if (it != demangled_names.end()) {
-        return it->second;
-    }
-
-    const char* mangled_name = type.name();
-    int status = ~0;
-    char* undecorated_name =
-        abi::__cxa_demangle(mangled_name, nullptr, nullptr, &status);
-
-    // status == 0: OK
-    // status == -1: memory allocation failure
-    // status == -2: name is invalid
-    // status == -3: one of the other arguments is invalid
-    if (status != 0) {
-        throw std::runtime_error(
-            std::string("__cxa_demangle failed for ") + mangled_name);
-    }
-
-    auto result = demangled_names.insert({type, undecorated_name});
-    free(undecorated_name);
-    return result.first->second;
-}
 
 struct Type {
     Type(const std::type_info& t) : _inner(t) {
@@ -48,7 +18,7 @@ struct Type {
     }
 
     template<typename T>
-    static Type of() {
+    static inline Type of() {
         return Type(typeid(T));
     }
 
@@ -56,9 +26,7 @@ struct Type {
         return _inner;
     }
 
-    const std::string& name() const {
-        return demangle_type_info(_inner);
-    }
+    const std::string& name() const;
 
     bool operator==(const Type& that) {
         return this->_inner == that._inner;
@@ -73,16 +41,16 @@ struct Type {
 };
 
 template<typename T>
-Type type_of() {
+static inline Type type_of() {
     return Type::of<T>();
 }
 
 template<typename T>
-Type type_of(const T&) {
+static inline Type type_of(const T&) {
     return Type::of<T>();
 }
 
-std::ostream& operator<<(std::ostream& os, const Type& t) {
+static inline std::ostream& operator<<(std::ostream& os, const Type& t) {
     return os << t.name();
 }
 

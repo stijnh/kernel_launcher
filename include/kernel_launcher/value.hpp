@@ -17,7 +17,7 @@ struct TunableValue {
     template<typename T>
     struct TypeIndicator {};
 
-    TunableValue(TunableValue&& val) {
+    TunableValue(TunableValue&& val) noexcept {
         *this = std::move(val);
     }
 
@@ -60,7 +60,7 @@ struct TunableValue {
         }
     }
 
-    TunableValue& operator=(TunableValue&& that) {
+    TunableValue& operator=(TunableValue&& that) noexcept {
         *this = that;  // TODO: make actual move operator=
         return *this;
     }
@@ -350,7 +350,7 @@ struct TunableValue {
     };
 };
 
-CastException::CastException(const TunableValue& value, Type type) :
+inline CastException::CastException(const TunableValue& value, Type type) :
     std::runtime_error(
         value.to_string() + " cannot be cast to " + type.name()) {}
 

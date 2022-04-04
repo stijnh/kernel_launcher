@@ -3,12 +3,14 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+#include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace kernel_launcher {
 
-std::string cu_error_message(CUresult err) {
+static inline std::string cu_error_message(CUresult err) {
     const char* name = "???";
     const char* description = "???";
     cuGetErrorName(err, &name);
@@ -34,7 +36,7 @@ struct CuException: std::runtime_error {
 
 #define cu_assert(expr) cu_assert_(expr, #expr)
 
-void cu_assert_(CUresult err, const char* s) {
+static inline void cu_assert_(CUresult err, const char* s) {
     if (err != CUDA_SUCCESS) {
         std::cout << "FAILED: " << s << std::endl;
         throw CuException(err);

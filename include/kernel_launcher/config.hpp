@@ -1,8 +1,5 @@
 #pragma once
 
-#include <random>
-#include <unordered_set>
-
 #include "kernel_launcher/expr.hpp"
 #include "kernel_launcher/utils.hpp"
 #include "kernel_launcher/value.hpp"
@@ -13,39 +10,16 @@ struct ConfigSpace;
 struct ConfigIterator;
 
 struct Config {
-    Config() {
-        //
-    }
-
+    Config() = default;
     const TunableValue& operator[](const TunableParam& param) const {
-        auto it = _inner.find(param);
-
-        if (it == _inner.end()) {
-            throw std::runtime_error(
-                std::string("unknown parameter: ") + param.name());
-        }
-
-        return it->second;
+        return at(param);
     }
 
-    const std::unordered_map<TunableParam, TunableValue>& get() const {
-        return _inner;
-    }
+    const TunableValue& at(const TunableParam& param) const;
+    void insert(TunableParam p, TunableValue v);
+    const std::unordered_map<TunableParam, TunableValue>& get() const;
 
-    void insert(TunableParam p, TunableValue v) {
-        _inner[std::move(p)] = std::move(v);
-    }
-
-    nlohmann::json to_json() const {
-        std::unordered_map<std::string, nlohmann::json> results;
-
-        for (const auto& p : _inner) {
-            results[p.first.name()] = p.second.to_json();
-        }
-
-        return results;
-    }
-
+    nlohmann::json to_json() const;
     static Config
     from_json(const nlohmann::json& json, const ConfigSpace& space);
 
@@ -54,15 +28,6 @@ struct Config {
 };
 
 struct ConfigSpace {
-    TunableParam create_param(
-        std::string name,
-        Type type,
-        std::vector<TunableValue> values) {
-        TunableParam p = TunableParam(name, type);
-        _params.insert({p, std::move(values)});
-        return p;
-    }
-
     template<typename T>
     ParamExpr<T> tune(std::string name, const std::vector<T>& values) {
         std::vector<TunableValue> tvalues;
@@ -86,144 +51,27 @@ struct ConfigSpace {
             create_param(std::move(name), type_of<T>(), std::move(tvalues)));
     }
 
-    void restrict(Expr<bool> expr) {
-        _restrictions.push_back(std::move(expr));
-    }
-
-    size_t size() const {
-        size_t n = 1;
-        for (const auto& p : _params) {
-            size_t k = p.second.size();
-            if (k == 0)
-                return 0;
-
-            // Check for overflows
-            if ((n * k) / k != n) {
-                throw std::runtime_error("integer overflow");
-            }
-
-            n *= k;
-        }
-
-        return n;
-    }
-
-    bool get(size_t index, Config& config) const {
-        for (const auto& p : _params) {
-            size_t n = p.second.size();
-            size_t i = index % n;
-            index /= n;
-
-            config.insert(p.first, p.second[i]);
-        }
-
-        return is_valid(config);
-    }
-
-    bool is_valid(const Config& config) const {
-        Eval eval = {config.get()};
-
-        for (const auto& r : _restrictions) {
-            if (!eval(r)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    Config sample() const {
-        size_t n = size();
-        std::random_device rd;
-        std::uniform_int_distribution<size_t> rng(0, n);
-        std::unordered_set<size_t> attempted;
-        Config config;
-
-        while (attempted.size() < n) {
-            size_t i = rng(rd);
-
-            if (attempted.insert(i).second) {
-                if (get(i, config)) {
-                    return config;
-                }
-            }
-        }
-
-        throw std::runtime_error("no valid configurations found");
-    }
-
-    Config load_config(const nlohmann::json& obj) const {
-        Config config;
-
-        for (const auto& p : _params) {
-            const TunableParam& param = p.first;
-            const std::vector<TunableValue>& valid_values = p.second;
-
-            TunableValue value = TunableValue::from_json(obj[param.name()]);
-            bool is_valid = false;
-
-            for (const auto& valid_value : valid_values) {
-                is_valid |= valid_value == value;
-            }
-
-            if (!is_valid) {
-                throw std::runtime_error("key not found: " + param.name());
-            }
-
-            config.insert(param, std::move(value));
-        }
-
-        Eval eval = {config.get()};
-        for (const auto& r : _restrictions) {
-            if (!eval(r)) {
-                throw std::runtime_error(
-                    "config does not pass restriction: " + r.to_string());
-            }
-        }
-
-        return config;
-    }
-
-    const TunableParam& operator[](std::string& s) const {
-        for (const auto& p : _params) {
-            if (p.first.name() == s) {
-                return p.first;
-            }
-        }
-
-        throw std::runtime_error("parameter not found: " + s);
-    }
-
     const std::unordered_map<TunableParam, std::vector<TunableValue>>&
     parameters() const {
         return _params;
     }
 
+    const TunableParam& operator[](std::string& s) const {
+        return at(s);
+    }
+
+    TunableParam
+    create_param(std::string name, Type type, std::vector<TunableValue> values);
+    const TunableParam& at(std::string& s) const;
+    void restrict(Expr<bool> expr);
+    size_t size() const;
+    bool get(size_t index, Config& config) const;
+    bool is_valid(const Config& config) const;
+    Config sample() const;
     ConfigIterator iterate() const;
 
-    nlohmann::json to_json() const {
-        using nlohmann::json;
-        json results = json::object();
-
-        std::unordered_map<std::string, json> params;
-        for (const auto& p : _params) {
-            std::vector<json> values;
-            for (const auto& v : p.second) {
-                values.push_back(v.to_json());
-            }
-
-            params[p.first.name()] = values;
-        }
-        results["parameters"] = params;
-
-        std::vector<json> restrictions;
-        for (const auto& d : _restrictions) {
-            restrictions.push_back(d.to_json());
-        }
-        results["restrictions"] = restrictions;
-
-        return results;
-    }
+    Config load_config(const nlohmann::json& obj) const;
+    nlohmann::json to_json() const;
 
   private:
     std::unordered_map<TunableParam, std::vector<TunableValue>> _params;
@@ -232,39 +80,16 @@ struct ConfigSpace {
 
 struct ConfigIterator {
     ConfigIterator() = default;
-
     ConfigIterator(ConfigSpace space) : _space(std::move(space)) {
-        _attempts = range(_space.size());
-
-        std::random_device device;
-        std::default_random_engine rng {device()};
-        std::shuffle(_attempts.begin(), _attempts.end(), rng);
+        reset();
     }
 
-    bool next(Config& config) {
-        while (!_attempts.empty()) {
-            size_t index = _attempts.back();
-            _attempts.pop_back();
-
-            if (_space.get(index, config)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    void reset();
+    bool next(Config& config);
 
   private:
     ConfigSpace _space;
     std::vector<size_t> _attempts;
 };
-
-ConfigIterator ConfigSpace::iterate() const {
-    return *this;
-}
-
-Config Config::from_json(const nlohmann::json& json, const ConfigSpace& space) {
-    return space.load_config(json);
-}
 
 }  // namespace kernel_launcher
