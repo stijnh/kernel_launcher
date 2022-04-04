@@ -244,4 +244,46 @@ struct NvrtcCompiler: Compiler {
     std::vector<std::string> _global_options;
 };
 
+struct AsyncCompiler: Compiler {
+    template<typename C>
+    AsyncCompiler(C compiler) : _inner(std::make_shared<C>(compiler)) {
+        //
+    }
+
+    std::future<CudaModule> compile(
+        const Source& kernel_source,
+        const std::string& kernel_name,
+        const std::vector<TemplateArg>& template_args,
+        const std::vector<Type>& parameter_types,
+        const std::vector<std::string>& options,
+        CUdevice* device_opt) const override {
+        CUdevice device;
+        if (device_opt) {
+            device = *device_opt;
+        } else {
+            cu_assert(cuCtxGetDevice(&device));
+        }
+
+        auto out = std::async(std::launch::async, [=]() {
+            CUdevice d = device;
+            CUcontext context;
+            cu_assert(cuDevicePrimaryCtxRetain(&context, device));
+            cu_assert(cuCtxSetCurrent(context));
+
+            return _inner
+                ->compile(
+                    kernel_source,
+                    kernel_name,
+                    template_args,
+                    parameter_types,
+                    options,
+                    &d)
+                .get();
+        });
+        return out;
+    }
+
+    std::shared_ptr<Compiler> _inner;
+};
+
 }  // namespace kernel_launcher

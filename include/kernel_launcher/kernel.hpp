@@ -18,16 +18,32 @@ struct RawKernel {
     }
 
     RawKernel(
-        CudaModule module,
+        std::future<CudaModule> future,
         dim3 block_size,
         dim3 grid_divisor,
         uint32_t shared_mem) :
-        _module(std::move(module)),
+        _future(std::move(future)),
         _block_size(block_size),
         _grid_divisor(grid_divisor),
         _shared_mem(shared_mem) {}
 
-    void launch(cudaStream_t stream, dim3 problem_size, void** args) const {
+    bool ready() const {
+        return _ready
+            || (_future.valid()
+                && _future.wait_for(std::chrono::seconds(0))
+                    == std::future_status::ready);
+    }
+
+    void wait_ready() const {
+        return _future.wait();
+    }
+
+    void launch(cudaStream_t stream, dim3 problem_size, void** args) {
+        if (!_ready) {
+            _ready = true;
+            _module = _future.get();
+        }
+
         dim3 grid_size = {
             div_ceil(problem_size.x, _grid_divisor.x),
             div_ceil(problem_size.y, _grid_divisor.y),
@@ -38,10 +54,12 @@ struct RawKernel {
     }
 
   private:
+    bool _ready = false;
+    std::future<CudaModule> _future;
     CudaModule _module;
-    dim3 _block_size;
-    dim3 _grid_divisor;
-    uint32_t _shared_mem;
+    dim3 _block_size = 0;
+    dim3 _grid_divisor = 0;
+    uint32_t _shared_mem = 0;
 };
 
 struct KernelBuilder: ConfigSpace {
@@ -196,15 +214,13 @@ struct KernelBuilder: ConfigSpace {
 
         uint32_t shared_mem = eval(_shared_mem);
 
-        CudaModule module = compiler
-                                .compile(
-                                    _kernel_source,
-                                    _kernel_name,
-                                    template_args,
-                                    parameter_types,
-                                    options,
-                                    nullptr)
-                                .get();
+        std::future<CudaModule> module = compiler.compile(
+            _kernel_source,
+            _kernel_name,
+            template_args,
+            parameter_types,
+            options,
+            nullptr);
 
         return RawKernel(
             std::move(module),
@@ -278,35 +294,34 @@ struct KernelArg<const T*> {
 template<typename T>
 using kernel_arg_t = typename KernelArg<T>::type;
 
-template<typename... Args>
+template<typename K, typename... Args>
 struct KernelInstantiation {
-    KernelInstantiation(
-        cudaStream_t stream,
-        dim3 problem_size,
-        const RawKernel& kernel) :
+    KernelInstantiation(cudaStream_t stream, dim3 problem_size, K& kernel) :
         _stream(stream),
         _problem_size(problem_size),
         _kernel(kernel) {
         //
     }
 
-    void launch(kernel_arg_t<Args>... args) const {
+    void launch(kernel_arg_t<Args>... args) {
         std::array<void*, sizeof...(Args)> raw_args = {&args...};
         _kernel.launch(_stream, _problem_size, raw_args.data());
     }
 
-    void operator()(kernel_arg_t<Args>... args) const {
+    void operator()(kernel_arg_t<Args>... args) {
         return launch(args...);
     }
 
   private:
     cudaStream_t _stream;
     dim3 _problem_size;
-    const RawKernel& _kernel;
+    K& _kernel;
 };
 
 template<typename... Args>
 struct Kernel {
+    using instance_type = KernelInstantiation<RawKernel, Args...>;
+
     Kernel() {
         //
     }
@@ -334,32 +349,28 @@ struct Kernel {
         _kernel = builder.compile(config, {type_of<Args>()...}, compiler);
     }
 
-    KernelInstantiation<Args...>
-    instantiate(cudaStream_t stream, dim3 problem_size) const {
-        return KernelInstantiation<Args...>(stream, problem_size, _kernel);
+    instance_type instantiate(cudaStream_t stream, dim3 problem_size) {
+        return instance_type(stream, problem_size, _kernel);
     }
 
-    KernelInstantiation<Args...>
-    operator()(cudaStream_t stream, dim3 problem_size) const {
+    instance_type operator()(cudaStream_t stream, dim3 problem_size) {
         return instantiate(stream, problem_size);
     }
 
-    KernelInstantiation<Args...> operator()(dim3 problem_size) const {
+    instance_type operator()(dim3 problem_size) {
         return instantiate(nullptr, problem_size);
     }
 
-    KernelInstantiation<Args...> operator()(
+    instance_type operator()(
         cudaStream_t stream,
         uint32_t problem_x,
-        uint32_t problem_y = 1,
-        uint32_t problem_z = 1) const {
+        uint32_t problem_y,
+        uint32_t problem_z = 1) {
         return instantiate(stream, dim3(problem_x, problem_y, problem_z));
     }
 
-    KernelInstantiation<Args...> operator()(
-        uint32_t problem_x,
-        uint32_t problem_y = 1,
-        uint32_t problem_z = 1) const {
+    instance_type
+    operator()(uint32_t problem_x, uint32_t problem_y, uint32_t problem_z = 1) {
         return instantiate(nullptr, dim3(problem_x, problem_y, problem_z));
     }
 

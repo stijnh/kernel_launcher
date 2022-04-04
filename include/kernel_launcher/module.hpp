@@ -57,11 +57,12 @@ struct CudaModule {
     }
 
     CudaModule(const char* image, const char* symbol) {
-        CUjit_option options[0] = {};
-        void* values[0] = {};
-
-        cu_assert(cuModuleLoadDataEx(&_module, image, 0, options, values));
+        cu_assert(cuModuleLoadDataEx(&_module, image, 0, nullptr, nullptr));
         cu_assert(cuModuleGetFunction(&_function, _module, symbol));
+    }
+
+    bool valid() const {
+        return _module != nullptr;
     }
 
     void launch(
@@ -86,7 +87,7 @@ struct CudaModule {
     }
 
     ~CudaModule() {
-        if (_module) {
+        if (valid()) {
             cuModuleUnload(_module);
             _module = nullptr;
             _function = nullptr;
@@ -96,6 +97,57 @@ struct CudaModule {
   private:
     CUmodule _module = nullptr;
     CUfunction _function = nullptr;
+};
+
+struct CudaEvent {
+    CudaEvent(const CudaEvent&) = delete;
+    CudaEvent& operator=(const CudaEvent&) = delete;
+
+    CudaEvent(CudaEvent&& that) {
+        *this = std::move(that);
+    }
+
+    CudaEvent& operator=(CudaEvent&& that) noexcept {
+        std::swap(that._event, _event);
+        return *this;
+    }
+
+    CudaEvent(unsigned int flags = CU_EVENT_DEFAULT) {
+        cu_assert(cuEventCreate(&_event, flags));
+    }
+
+    CUevent get() const {
+        return _event;
+    }
+
+    operator CUevent() const {
+        return _event;
+    }
+
+    void synchronize() const {
+        cu_assert(cuEventSynchronize(_event));
+    }
+
+    void record(CUstream stream) const {
+        cu_assert(cuEventRecord(_event, stream));
+    }
+
+    float elapsed_since(CUevent before) const {
+        float time = 1337;
+        cu_assert(cuEventElapsedTime(&time, before, _event));
+        return time;
+    }
+
+    ~CudaEvent() {
+        if (_event) {
+            cu_assert(cuEventSynchronize(_event));
+            cu_assert(cuEventDestroy(_event));
+            _event = nullptr;
+        }
+    }
+
+  private:
+    CUevent _event = nullptr;
 };
 
 template<typename T = char>

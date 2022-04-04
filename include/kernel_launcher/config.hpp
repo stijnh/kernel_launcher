@@ -33,7 +33,7 @@ struct Config {
     }
 
     void insert(TunableParam p, TunableValue v) {
-        _inner.insert({std::move(p), std::move(v)});
+        _inner[std::move(p)] = std::move(v);
     }
 
     nlohmann::json to_json() const {
@@ -108,9 +108,7 @@ struct ConfigSpace {
         return n;
     }
 
-    Config get(size_t index) const {
-        Config config;
-
+    bool get(size_t index, Config& config) const {
         for (const auto& p : _params) {
             size_t n = p.second.size();
             size_t i = index % n;
@@ -119,7 +117,7 @@ struct ConfigSpace {
             config.insert(p.first, p.second[i]);
         }
 
-        return config;
+        return is_valid(config);
     }
 
     bool is_valid(const Config& config) const {
@@ -139,14 +137,13 @@ struct ConfigSpace {
         std::random_device rd;
         std::uniform_int_distribution<size_t> rng(0, n);
         std::unordered_set<size_t> attempted;
+        Config config;
 
         while (attempted.size() < n) {
             size_t i = rng(rd);
 
             if (attempted.insert(i).second) {
-                Config config = get(i);
-
-                if (is_valid(config)) {
+                if (get(i, config)) {
                     return config;
                 }
             }
@@ -169,7 +166,7 @@ struct ConfigSpace {
                 is_valid |= valid_value == value;
             }
 
-            if (is_valid) {
+            if (!is_valid) {
                 throw std::runtime_error("key not found: " + param.name());
             }
 
@@ -185,6 +182,21 @@ struct ConfigSpace {
         }
 
         return config;
+    }
+
+    const TunableParam& operator[](std::string& s) const {
+        for (const auto& p : _params) {
+            if (p.first.name() == s) {
+                return p.first;
+            }
+        }
+
+        throw std::runtime_error("parameter not found: " + s);
+    }
+
+    const std::unordered_map<TunableParam, std::vector<TunableValue>>&
+    parameters() const {
+        return _params;
     }
 
     ConfigIterator iterate() const;
@@ -219,21 +231,22 @@ struct ConfigSpace {
 };
 
 struct ConfigIterator {
+    ConfigIterator() = default;
+
     ConfigIterator(ConfigSpace space) : _space(std::move(space)) {
         _attempts = range(_space.size());
 
-        std::default_random_engine rng {0};
+        std::random_device device;
+        std::default_random_engine rng {device()};
         std::shuffle(_attempts.begin(), _attempts.end(), rng);
     }
 
     bool next(Config& config) {
         while (!_attempts.empty()) {
-            size_t i = _attempts.back();
+            size_t index = _attempts.back();
             _attempts.pop_back();
 
-            config = _space.get(i);
-
-            if (_space.is_valid(config)) {
+            if (_space.get(index, config)) {
                 return true;
             }
         }
