@@ -35,6 +35,8 @@ struct TunableValue {
 
     TunableValue(Type t) : TunableValue(t.name()) {}
 
+    TunableValue(TemplateArg t) : TunableValue(t.get()) {}
+
     TunableValue(double i) : _type(type_double), _double_val(i) {}
 
     TunableValue(float i) : _type(type_double), _double_val(i) {}
@@ -67,30 +69,47 @@ struct TunableValue {
 
     TunableValue& operator=(const TunableValue& val) {
         clear();
+        _type = val._type;
 
-        switch (val._type) {
+        switch (_type) {
             case type_double:
-                _type = type_double;
                 _double_val = val._double_val;
                 break;
             case type_int:
-                _type = type_int;
                 _int_val = val._int_val;
                 break;
             case type_string:
-                _type = type_string;
                 _string_val = val._string_val;
                 break;
-            case type_empty:
-                _type = type_empty;
-                break;
             case type_bool:
-                _type = type_bool;
                 _bool_val = val._bool_val;
+                break;
+            case type_empty:
                 break;
         }
 
         return *this;
+    }
+
+    bool operator==(const TunableValue& that) const {
+        if (this->_type != that._type) {
+            return false;
+        }
+
+        switch (_type) {
+            case type_empty:
+                return true;
+            case type_int:
+                return this->_int_val == that._int_val;
+            case type_double:
+                return this->_double_val == that._double_val;
+            case type_string:
+                return this->_string_val == that._string_val;
+            case type_bool:
+                return this->_bool_val == that._bool_val;
+            default:
+                return false;
+        }
     }
 
     bool is_empty() const {
@@ -143,27 +162,6 @@ struct TunableValue {
 
     explicit operator float() const {
         return to_float();
-    }
-
-    bool operator==(const TunableValue& that) const {
-        if (this->_type != that._type) {
-            return false;
-        }
-
-        switch (_type) {
-            case type_empty:
-                return true;
-            case type_int:
-                return this->_int_val == that._int_val;
-            case type_double:
-                return this->_double_val == that._double_val;
-            case type_string:
-                return this->_string_val == that._string_val;
-            case type_bool:
-                return this->_bool_val == that._bool_val;
-            default:
-                return false;
-        }
     }
 
     bool operator!=(const TunableValue& that) const {
