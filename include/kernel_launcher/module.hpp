@@ -3,10 +3,13 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+#include <cstring>
 #include <iostream>
 #include <stdexcept>
 #include <string>
 #include <vector>
+
+#include "kernel_launcher/utils.hpp"
 
 namespace kernel_launcher {
 
@@ -154,6 +157,89 @@ struct CudaEvent {
     CUevent _event = nullptr;
 };
 
+struct CudaDevice {
+    CudaDevice() = default;
+    explicit CudaDevice(CUdevice d) : _device(d) {}
+
+    static int count() {
+        int n;
+        KERNEL_LAUNCHER_ASSERT(cuDeviceGetCount(&n));
+        return n;
+    }
+
+    static CudaDevice current() {
+        CUdevice d;
+        KERNEL_LAUNCHER_ASSERT(cuCtxGetDevice(&d));
+        return CudaDevice(d);
+    }
+
+    std::string name() const {
+        char name[1024];
+        KERNEL_LAUNCHER_ASSERT(cuDeviceGetName(name, sizeof(name), _device));
+        return name;
+    }
+
+    CUdevice get() const {
+        return _device;
+    }
+
+    operator CUdevice() const {
+        return get();
+    }
+
+  private:
+    CUdevice _device = -1;
+};
+
+namespace detail {
+    template<typename T, size_t N = sizeof(T), typename = void>
+    struct MemoryFill {
+        static void call(T*, size_t, T) {
+            throw std::runtime_error(
+                std::string("fill not supported for values of type: ")
+                + type_of<T>().name());
+        }
+    };
+
+    template<typename T>
+    struct MemoryFill<
+        T,
+        sizeof(unsigned char),
+        typename std::enable_if<std::is_trivial<T>::value>::type> {
+        static void call(T* data, size_t n, T value) {
+            unsigned char raw_value;
+            std::memcpy(&raw_value, &value, sizeof(unsigned char));
+            KERNEL_LAUNCHER_ASSERT(cuMemsetD8((CUdeviceptr)data, raw_value, n));
+        }
+    };
+
+    template<typename T>
+    struct MemoryFill<
+        T,
+        sizeof(unsigned short),
+        typename std::enable_if<std::is_trivial<T>::value>::type> {
+        static void call(T* data, size_t n, T value) {
+            unsigned short raw_value;
+            std::memcpy(&raw_value, &value, sizeof(unsigned short));
+            KERNEL_LAUNCHER_ASSERT(
+                cuMemsetD16((CUdeviceptr)data, raw_value, n));
+        }
+    };
+
+    template<typename T>
+    struct MemoryFill<
+        T,
+        sizeof(unsigned int),
+        typename std::enable_if<std::is_trivial<T>::value>::type> {
+        static void call(T* data, size_t n, T value) {
+            unsigned int raw_value;
+            std::memcpy(&raw_value, &value, sizeof(unsigned int));
+            KERNEL_LAUNCHER_ASSERT(
+                cuMemsetD32((CUdeviceptr)data, raw_value, n));
+        }
+    };
+}  // namespace detail
+
 template<typename T = char>
 struct Memory;
 
@@ -165,12 +251,12 @@ struct MemoryView {
     }
 
     MemoryView(const MemoryView<T>& mem) {
-        _device_ptr = (T*)mem.get();
+        _device_ptr = (T*)mem.data();
         _size = mem.size();
     }
 
     MemoryView(const Memory<T>& mem) {
-        _device_ptr = (T*)mem.get();
+        _device_ptr = (T*)mem.data();
         _size = mem.size();
     }
 
@@ -196,12 +282,20 @@ struct MemoryView {
         m.copy_to(*this);
     }
 
-    void copy_to(std::vector<T>& m) const {
-        copy_to(MemoryView<T>(m.data(), m.size()));
+    void copy_to(T* ptr, size_t n) const {
+        copy_to(MemoryView<T>(ptr, n));
     }
 
-    void copy_from(const std::vector<T>& m) {
-        copy_from(MemoryView<T>((T*)m.data(), m.size()));
+    void copy_to(std::vector<T>& v) const {
+        copy_to(v.data(), v.size());
+    }
+
+    void copy_from(const T* ptr, size_t n) {
+        copy_from(MemoryView<T>((T*)ptr, n));
+    }
+
+    void copy_from(const std::vector<T>& v) {
+        copy_from(v.data(), v.size());
     }
 
     std::vector<T> to_vector() const {
@@ -210,20 +304,20 @@ struct MemoryView {
         return data;
     }
 
-    T* get() {
+    T* data() {
         return _device_ptr;
     }
 
-    const T* get() const {
+    const T* data() const {
         return _device_ptr;
     }
 
     operator T*() {
-        return get();
+        return data();
     }
 
     operator const T*() const {
-        return get();
+        return data();
     }
 
     size_t size() const {
@@ -242,6 +336,20 @@ struct MemoryView {
         return MemoryView(_device_ptr + start, len);
     }
 
+    Memory<T> clone() const {
+        Memory<T> new_buffer = Memory<T>(size());
+        new_buffer.copy_from(*this);
+        return new_buffer;
+    }
+
+    void fill(T value) {
+        detail::MemoryFill<T>::call(_device_ptr, _size, value);
+    }
+
+    void fill_zeros() {
+        detail::MemoryFill<char>::call((char*)_device_ptr, size_in_bytes(), 0);
+    }
+
   protected:
     T* _device_ptr;
     size_t _size;
@@ -252,6 +360,15 @@ struct Memory: MemoryView<T> {
     Memory(const Memory&) = delete;
     Memory& operator=(const Memory&) = delete;
 
+    Memory() {
+        //
+    }
+
+    Memory(const std::vector<T>& values) {
+        allocate(values.size());
+        this->copy_from(values);
+    }
+
     Memory(Memory&& that) {
         *this = std::move(that);
     }
@@ -261,17 +378,20 @@ struct Memory: MemoryView<T> {
         std::swap(this->_size, that._size);
     }
 
-    Memory(const std::vector<T>& values) {
-        allocate(values.size());
-        this->copy_from(values);
-    }
-
-    explicit Memory(size_t n = 0) {
+    explicit Memory(size_t n) {
         allocate(n);
     }
 
     ~Memory() {
         free();
+    }
+
+    void resize(size_t new_size) {
+        if (new_size != this->size()) {
+            Memory<T> new_buffer = Memory<T>(new_size);
+            this->copy_to(new_buffer);
+            *this = std::move(new_buffer);
+        }
     }
 
     void allocate(size_t n) {
