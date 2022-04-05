@@ -134,6 +134,9 @@ RawKernel KernelBuilder::compile(
         options.push_back(p.first + "=" + eval(p.second));
     }
 
+    options.push_back("-DKERNEL_LAUNCHER=1");
+    options.push_back("-Dkernel_tuner=1");
+
     dim3 block_size = {
         eval(_block_size[0]),
         eval(_block_size[1]),
