@@ -95,7 +95,7 @@ static void assert_header_correct(
         if (expected != gotten) {
             throw std::runtime_error(
                 "error while opening " + filename
-                + ": results have been tuned for kernel '" + expected
+                + ": results have been tuned for kernel '" + gotten
                 + "', but current kernel is '" + expected + "'");
         }
     }
@@ -106,7 +106,7 @@ static void assert_header_correct(
         if (expected != gotten) {
             throw std::runtime_error(
                 "error while opening " + filename
-                + ": results have been tuned for device '" + expected
+                + ": results have been tuned for device '" + gotten
                 + "', but current device is '" + expected + "'");
         }
     }
