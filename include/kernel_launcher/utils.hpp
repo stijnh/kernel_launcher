@@ -50,6 +50,16 @@ static inline Type type_of(const T&) {
     return Type::of<T>();
 }
 
+template<typename T>
+static inline const std::string& type_name() {
+    return Type::of<T>().name();
+}
+
+template<typename T>
+static inline const std::string& type_name(const T&) {
+    return Type::of<T>().name();
+}
+
 static inline std::ostream& operator<<(std::ostream& os, const Type& t) {
     return os << t.name();
 }
