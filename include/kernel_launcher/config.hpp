@@ -11,6 +11,11 @@ struct ConfigIterator;
 
 struct Config {
     Config() = default;
+    explicit Config(const Config&) = default;
+    Config(Config&&) = default;
+    Config& operator=(Config&&) = default;
+    Config& operator=(const Config&) = delete;
+
     const TunableValue& operator[](const TunableParam& param) const {
         return at(param);
     }
