@@ -118,6 +118,7 @@ struct AsyncCompiler: Compiler {
         const std::vector<std::string>& options,
         CUdevice* device_opt) const override;
 
+  private:
     std::shared_ptr<Compiler> _inner;
 };
 

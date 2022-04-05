@@ -389,7 +389,10 @@ struct Memory: MemoryView<T> {
     void resize(size_t new_size) {
         if (new_size != this->size()) {
             Memory<T> new_buffer = Memory<T>(new_size);
-            this->copy_to(new_buffer);
+
+            size_t n = std::min(new_size, this->size());
+            this->slice(0, n).copy_to(new_buffer.slice(0, n));
+
             *this = std::move(new_buffer);
         }
     }
