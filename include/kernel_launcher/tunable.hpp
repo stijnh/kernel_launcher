@@ -100,7 +100,7 @@ struct RawTuneKernel {
     CudaEvent before_event_;
     CudaEvent after_event_;
 
-    double best_performance_ = 1e9;
+    double best_performance_ = -1e99;
     RawKernel best_kernel_;
 
     Config current_config_;

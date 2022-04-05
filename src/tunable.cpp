@@ -273,7 +273,7 @@ bool CachingStrategy::submit(double performance, Config& config) {
         first_run_ = false;
         config = std::move(first_config_);
     } else {
-        cache_.append(config, 1 / performance);
+        cache_.append(config, performance);
 
         if (!inner_->submit(performance, config)) {
             return false;
@@ -329,9 +329,9 @@ void RawTuneKernel::next_configuration() {
             throw std::runtime_error("search strategy failed to initialize");
         }
     } else if (state_ == state_tuning) {
-        double performance = current_time_ / current_workload_;
+        double performance = current_workload_ / current_time_;
 
-        if (performance < best_performance_) {
+        if (performance > best_performance_) {
             best_kernel_ = std::exchange(current_kernel_, {});
             best_performance_ = performance;
         }
