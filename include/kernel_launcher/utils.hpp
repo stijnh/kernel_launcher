@@ -13,7 +13,7 @@
 namespace kernel_launcher {
 
 struct Type {
-    Type(const std::type_info& t) : _inner(t) {
+    Type(const std::type_info& t) : inner_(t) {
         //
     }
 
@@ -23,13 +23,13 @@ struct Type {
     }
 
     const std::type_info& get() const {
-        return _inner;
+        return inner_;
     }
 
     const std::string& name() const;
 
     bool operator==(const Type& that) {
-        return this->_inner == that._inner;
+        return this->inner_ == that.inner_;
     }
 
     bool operator!=(const Type& that) {
@@ -37,7 +37,7 @@ struct Type {
     }
 
   private:
-    const std::type_info& _inner;
+    const std::type_info& inner_;
 };
 
 template<typename T>
@@ -67,7 +67,7 @@ static inline std::ostream& operator<<(std::ostream& os, const Type& t) {
 struct TemplateArg {
 #define CONSTRUCTOR(type)                                        \
     TemplateArg(type i) {                                        \
-        _inner = std::string("(" #type ")") + std::to_string(i); \
+        inner_ = std::string("(" #type ")") + std::to_string(i); \
     }
     CONSTRUCTOR(signed char);
     CONSTRUCTOR(short);
@@ -84,11 +84,11 @@ struct TemplateArg {
 #undef CONSTRUCTOR
 
     TemplateArg(bool b) {
-        _inner = b ? "(bool)true" : "(bool)false";
+        inner_ = b ? "(bool)true" : "(bool)false";
     }
 
     TemplateArg(Type type) {
-        _inner = type.name();
+        inner_ = type.name();
     }
 
     template<typename T>
@@ -98,16 +98,16 @@ struct TemplateArg {
 
     static TemplateArg from_string(std::string s) {
         TemplateArg t(0);
-        t._inner = std::move(s);
+        t.inner_ = std::move(s);
         return t;
     }
 
     const std::string& get() const {
-        return _inner;
+        return inner_;
     }
 
   private:
-    std::string _inner;
+    std::string inner_;
 };
 
 template<typename T>
@@ -126,37 +126,37 @@ struct TunableParam {
         friend TunableParam;
 
         Impl(std::string name, Type type) :
-            _name(std::move(name)),
-            _type(std::move(type)) {
+            name_(std::move(name)),
+            type_(std::move(type)) {
             static std::atomic<uint64_t> COUNTER = {1};
-            _key = COUNTER++;
+            key_ = COUNTER++;
         }
 
       private:
-        uint64_t _key;
-        std::string _name;
-        Type _type;
+        uint64_t key_;
+        std::string name_;
+        Type type_;
     };
 
   public:
     TunableParam(std::string name, Type type) {
-        _inner = std::make_shared<Impl>(std::move(name), std::move(type));
+        inner_ = std::make_shared<Impl>(std::move(name), std::move(type));
     }
 
     const std::string& name() const {
-        return _inner->_name;
+        return inner_->name_;
     }
 
     uint64_t key() const {
-        return _inner->_key;
+        return inner_->key_;
     }
 
     Type type() const {
-        return _inner->_type;
+        return inner_->type_;
     }
 
     bool operator==(const TunableParam& that) const {
-        return _inner.get() == that._inner.get();
+        return inner_.get() == that.inner_.get();
     }
 
     bool operator!=(const TunableParam& that) const {
@@ -164,7 +164,7 @@ struct TunableParam {
     }
 
   private:
-    std::shared_ptr<Impl> _inner;
+    std::shared_ptr<Impl> inner_;
 };
 
 template<

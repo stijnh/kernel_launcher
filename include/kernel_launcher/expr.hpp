@@ -15,13 +15,13 @@ using TunableMap = std::unordered_map<TunableParam, TunableValue>;
 static const TunableMap EMPTY_CONFIG = {};
 
 struct Eval {
-    Eval(const TunableMap& mapping = EMPTY_CONFIG) : _inner(mapping) {
+    Eval(const TunableMap& mapping = EMPTY_CONFIG) : inner_(mapping) {
         //
     }
 
     template<typename T>
     T lookup(const TunableParam& param) const {
-        return _inner.at(param).to<T>();
+        return inner_.at(param).to<T>();
     }
 
     template<typename R>
@@ -35,7 +35,7 @@ struct Eval {
     }
 
   private:
-    const TunableMap& _inner;
+    const TunableMap& inner_;
 };
 
 template<typename R>
@@ -337,50 +337,50 @@ namespace detail {
 
 template<typename E, typename O, typename I = typename E::return_type>
 struct ConvertExpr: BaseExpr<O> {
-    ConvertExpr(E value) : _inner(std::move(value)) {
+    ConvertExpr(E value) : inner_(std::move(value)) {
         //
     }
 
     std::string to_string() const override {
-        return _inner.to_string();
+        return inner_.to_string();
     }
 
     O eval(const Eval& eval) const override {
-        return detail::CastHelper<I, O>::call(eval(_inner));
+        return detail::CastHelper<I, O>::call(eval(inner_));
     }
 
     nlohmann::json to_json() const override {
         return {
             {"operator", "convert"},
             {"type", type_of<O>().name()},
-            {"operand", _inner.to_json()},
+            {"operand", inner_.to_json()},
         };
     }
 
   private:
-    E _inner;
+    E inner_;
 };
 
 template<typename E, typename I>
 struct ConvertExpr<E, I, I>: BaseExpr<I> {
-    ConvertExpr(E value) : _inner(std::move(value)) {
+    ConvertExpr(E value) : inner_(std::move(value)) {
         //
     }
 
     std::string to_string() const override {
-        return _inner.to_string();
+        return inner_.to_string();
     }
 
     I eval(const Eval& eval) const override {
-        return eval(_inner);
+        return eval(inner_);
     }
 
     nlohmann::json to_json() const override {
-        return _inner.to_json();
+        return inner_.to_json();
     }
 
   private:
-    E _inner;
+    E inner_;
 };
 
 template<typename O, typename E>
@@ -396,32 +396,32 @@ template<
         common_type<typename L::return_type, typename R::return_type>::type>
 struct CondExpr: BaseExpr<O> {
     CondExpr(C cond, L left, R right) :
-        _cond(std::move(cond)),
-        _left(std::move(left)),
-        _right(std::move(right)) {}
+        cond_(std::move(cond)),
+        left_(std::move(left)),
+        right_(std::move(right)) {}
 
     std::string to_string() const override {
-        return "(" + _cond.to_string() + " ? " + _left.to_string() + " : "
-            + _right.to_string() + ")";
+        return "(" + cond_.to_string() + " ? " + left_.to_string() + " : "
+            + right_.to_string() + ")";
     }
 
     O eval(const Eval& eval) const override {
-        return eval(_cond) ? eval(_left) : eval(_right);
+        return eval(cond_) ? eval(left_) : eval(right_);
     }
 
     nlohmann::json to_json() const override {
         return {
             {"operator", "conditional"},
-            {"condition", _cond.to_json()},
-            {"left", _left.to_json()},
-            {"right", _right.to_json()},
+            {"condition", cond_.to_json()},
+            {"left", left_.to_json()},
+            {"right", right_.to_json()},
         };
     }
 
   private:
-    C _cond;
-    L _left;
-    R _right;
+    C cond_;
+    L left_;
+    R right_;
 };
 
 template<typename C, typename L, typename R>
@@ -442,23 +442,23 @@ struct Expr: BaseExpr<T> {
     template<typename S, typename = expr_type<S>>
     Expr(S value) {
         auto e = cast<T>(expr(std::move(value)));
-        _inner = std::make_shared<decltype(e)>(e);
+        inner_ = std::make_shared<decltype(e)>(e);
     }
 
     T eval(const Eval& eval) const override {
-        return _inner->eval(eval);
+        return inner_->eval(eval);
     }
 
     std::string to_string() const override {
-        return _inner->to_string();
+        return inner_->to_string();
     }
 
     nlohmann::json to_json() const override {
-        return _inner->to_json();
+        return inner_->to_json();
     }
 
   private:
-    std::shared_ptr<BaseExpr<T>> _inner {};
+    std::shared_ptr<BaseExpr<T>> inner_ {};
 };
 
 }  // namespace kernel_launcher

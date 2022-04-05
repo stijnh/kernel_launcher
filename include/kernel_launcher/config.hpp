@@ -29,7 +29,7 @@ struct Config {
     from_json(const nlohmann::json& json, const ConfigSpace& space);
 
   private:
-    std::unordered_map<TunableParam, TunableValue> _inner;
+    std::unordered_map<TunableParam, TunableValue> inner_;
 };
 
 struct ConfigSpace {
@@ -58,7 +58,7 @@ struct ConfigSpace {
 
     const std::unordered_map<TunableParam, std::vector<TunableValue>>&
     parameters() const {
-        return _params;
+        return params_;
     }
 
     const TunableParam& operator[](std::string& s) const {
@@ -79,13 +79,13 @@ struct ConfigSpace {
     nlohmann::json to_json() const;
 
   private:
-    std::unordered_map<TunableParam, std::vector<TunableValue>> _params;
-    std::vector<Expr<bool>> _restrictions;
+    std::unordered_map<TunableParam, std::vector<TunableValue>> params_;
+    std::vector<Expr<bool>> restrictions_;
 };
 
 struct ConfigIterator {
     ConfigIterator() = default;
-    ConfigIterator(ConfigSpace space) : _space(std::move(space)) {
+    ConfigIterator(ConfigSpace space) : space_(std::move(space)) {
         reset();
     }
 
@@ -93,8 +93,8 @@ struct ConfigIterator {
     bool next(Config& config);
 
   private:
-    ConfigSpace _space;
-    std::vector<size_t> _attempts;
+    ConfigSpace space_;
+    std::vector<size_t> attempts_;
 };
 
 }  // namespace kernel_launcher

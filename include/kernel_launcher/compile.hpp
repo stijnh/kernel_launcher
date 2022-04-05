@@ -14,8 +14,8 @@ namespace kernel_launcher {
 
 struct Source {
     Source(std::string filename) :
-        _filename(std::move(filename)),
-        _has_content(false) {
+        filename_(std::move(filename)),
+        has_content_(false) {
         //
     }
 
@@ -24,53 +24,53 @@ struct Source {
     }
 
     Source(std::string filename, std::string content) :
-        _filename(std::move(filename)),
-        _content(std::move(content)),
-        _has_content(true) {
+        filename_(std::move(filename)),
+        content_(std::move(content)),
+        has_content_(true) {
         //
     }
 
     std::string file_name() const {
-        return _filename;
+        return filename_;
     }
 
     std::string read() const {
-        if (_has_content) {
-            return _content;
+        if (has_content_) {
+            return content_;
         }
 
-        std::ifstream t(_filename);
+        std::ifstream t(filename_);
         return {
             (std::istreambuf_iterator<char>(t)),
             std::istreambuf_iterator<char>()};
     }
 
   private:
-    std::string _filename;
-    std::string _content;
-    bool _has_content;
+    std::string filename_;
+    std::string content_;
+    bool has_content_;
 };
 
 struct NvrtcException: std::runtime_error {
     NvrtcException(nvrtcResult err) :
         std::runtime_error(nvrtcGetErrorString(err)),
-        _err(err) {
+        err_(err) {
         //
     }
 
     NvrtcException(nvrtcResult err, std::string msg) :
         std::runtime_error(
             nvrtcGetErrorString(err) + std::string(": ") + std::move(msg)),
-        _err(err) {
+        err_(err) {
         //
     }
 
     nvrtcResult error() const {
-        return _err;
+        return err_;
     }
 
   private:
-    nvrtcResult _err;
+    nvrtcResult err_;
 };
 
 struct Compiler {
@@ -89,7 +89,7 @@ struct NvrtcCompiler: Compiler {
     }
 
     void add_option(std::string opt) {
-        _global_options.push_back(opt);
+        global_options_.push_back(opt);
     }
 
     std::future<CudaModule> compile(
@@ -101,12 +101,12 @@ struct NvrtcCompiler: Compiler {
         CUdevice* device_opt) const override;
 
   private:
-    std::vector<std::string> _global_options;
+    std::vector<std::string> global_options_;
 };
 
 struct AsyncCompiler: Compiler {
     template<typename C>
-    AsyncCompiler(C compiler) : _inner(std::make_shared<C>(compiler)) {
+    AsyncCompiler(C compiler) : inner_(std::make_shared<C>(compiler)) {
         //
     }
 
@@ -119,7 +119,7 @@ struct AsyncCompiler: Compiler {
         CUdevice* device_opt) const override;
 
   private:
-    std::shared_ptr<Compiler> _inner;
+    std::shared_ptr<Compiler> inner_;
 };
 
 }  // namespace kernel_launcher

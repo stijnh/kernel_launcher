@@ -87,7 +87,7 @@ std::future<CudaModule> NvrtcCompiler::compile(
     std::vector<const char*> all_options;
     bool mentions_std = false;
 
-    for (auto& opt : _global_options) {
+    for (auto& opt : global_options_) {
         all_options.push_back(opt.c_str());
         mentions_std |= opt.find("-std") == 0;
     }
@@ -171,7 +171,7 @@ std::future<CudaModule> AsyncCompiler::compile(
     auto out = std::async(std::launch::async, [=]() {
         KERNEL_LAUNCHER_ASSERT(cuCtxSetCurrent(context));
 
-        return _inner
+        return inner_
             ->compile(
                 kernel_source,
                 kernel_name,

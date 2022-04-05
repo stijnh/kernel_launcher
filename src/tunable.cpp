@@ -7,12 +7,12 @@ namespace kernel_launcher {
 using nlohmann::json;
 
 bool RandomStrategy::init(const KernelBuilder& builder, Config& config) {
-    _iter = builder.iterate();
-    return _iter.next(config);
+    iter_ = builder.iterate();
+    return iter_.next(config);
 }
 
 bool RandomStrategy::submit(double, Config& config) {
-    return _iter.next(config);
+    return iter_.next(config);
 }
 
 static std::string current_date() {
@@ -133,23 +133,23 @@ static void assert_header_correct(
 bool TuningCache::initialize(
     const KernelBuilder& builder,
     Config& best_config) {
-    _initialized = true;
-    _parameters.clear();
-    _cache.clear();
+    initialized_ = true;
+    parameters_.clear();
+    cache_.clear();
 
     for (const auto& p : builder.parameters()) {
-        _parameters.push_back(p.first);
+        parameters_.push_back(p.first);
     }
 
-    std::sort(_parameters.begin(), _parameters.end(), [](auto a, auto b) {
+    std::sort(parameters_.begin(), parameters_.end(), [](auto a, auto b) {
         return a.name() < b.name();
     });
 
-    std::ifstream stream(_filename.c_str());
+    std::ifstream stream(filename_.c_str());
 
     if (!stream) {
-        std::ofstream ostream(_filename.c_str());
-        ostream << create_header(builder, _parameters);
+        std::ofstream ostream(filename_.c_str());
+        ostream << create_header(builder, parameters_);
         return false;
     }
 
@@ -166,12 +166,12 @@ bool TuningCache::initialize(
 
         if (!seen_header) {
             seen_header = true;
-            assert_header_correct(_filename, builder, _parameters, record);
+            assert_header_correct(filename_, builder, parameters_, record);
             continue;
         }
 
         double performance = record["performance"];
-        _cache[record["key"]] = performance;
+        cache_[record["key"]] = performance;
 
         if (performance > best_performance) {
             best_record = record;
@@ -206,9 +206,9 @@ config_to_key(const Config& config, const std::vector<TunableParam>& params) {
 }
 
 void TuningCache::append(const Config& config, double performance) {
-    KERNEL_LAUNCHER_ASSERT(_initialized);
-    std::string key = config_to_key(config, _parameters);
-    _cache[key] = performance;
+    KERNEL_LAUNCHER_ASSERT(initialized_);
+    std::string key = config_to_key(config, parameters_);
+    cache_[key] = performance;
 
     json record = {
         {"key", std::move(key)},
@@ -217,15 +217,15 @@ void TuningCache::append(const Config& config, double performance) {
         {"performance", performance}};
 
     // TODO: Maybe check if file has changed in the meantime somehow?
-    std::ofstream stream(_filename, std::ofstream::app);
+    std::ofstream stream(filename_, std::ofstream::app);
     stream << "\n" << record;
 }
 
 bool TuningCache::find(const Config& config, double& answer) const {
-    std::string key = config_to_key(config, _parameters);
-    auto it = _cache.find(key);
+    std::string key = config_to_key(config, parameters_);
+    auto it = cache_.find(key);
 
-    if (it == _cache.end()) {
+    if (it == cache_.end()) {
         return false;
     }
 
@@ -251,105 +251,105 @@ static bool internal_submit(
 }
 
 bool CachingStrategy::init(const KernelBuilder& builder, Config& config) {
-    if (!_inner->init(builder, config)) {
+    if (!inner_->init(builder, config)) {
         return false;
     }
 
     Config best_config;
-    if (_cache.initialize(builder, best_config)) {
-        _first_run = true;
-        _first_config = std::move(config);
+    if (cache_.initialize(builder, best_config)) {
+        first_run_ = true;
+        first_config_ = std::move(config);
         config = std::move(best_config);
         return true;
     } else {
-        _first_run = false;
+        first_run_ = false;
     }
 
-    return internal_submit(_cache, *_inner, config);
+    return internal_submit(cache_, *inner_, config);
 }
 
 bool CachingStrategy::submit(double performance, Config& config) {
-    if (_first_run) {
-        _first_run = false;
-        config = std::move(_first_config);
+    if (first_run_) {
+        first_run_ = false;
+        config = std::move(first_config_);
     } else {
-        _cache.append(config, 1 / performance);
+        cache_.append(config, 1 / performance);
 
-        if (!_inner->submit(performance, config)) {
+        if (!inner_->submit(performance, config)) {
             return false;
         }
     }
 
-    return internal_submit(_cache, *_inner, config);
+    return internal_submit(cache_, *inner_, config);
 }
 
 void RawTuneKernel::launch(
     cudaStream_t stream,
     dim3 problem_size,
     void** args) {
-    if (_state == state_tuning) {
-        _after_event.synchronize();
-        _current_time += _after_event.seconds_elapsed_since(_before_event);
+    if (state_ == state_tuning) {
+        after_event_.synchronize();
+        current_time_ += after_event_.seconds_elapsed_since(before_event_);
 
-        if (_current_time > 1.0) {
+        if (current_time_ > 1.0) {
             next_configuration();
         }
     }
 
-    if (_state == state_finished) {
-        _best_kernel.launch(stream, problem_size, args);
+    if (state_ == state_finished) {
+        best_kernel_.launch(stream, problem_size, args);
         return;
     }
 
-    if (_state == state_compiling) {
-        if (!_current_kernel.ready() && _best_kernel.ready()) {
-            _best_kernel.launch(stream, problem_size, args);
+    if (state_ == state_compiling) {
+        if (!current_kernel_.ready() && best_kernel_.ready()) {
+            best_kernel_.launch(stream, problem_size, args);
             return;
         }
 
-        _current_kernel.wait_ready();
-        _state = state_tuning;
+        current_kernel_.wait_ready();
+        state_ = state_tuning;
     }
 
-    if (_state != state_tuning) {
+    if (state_ != state_tuning) {
         throw std::runtime_error("kernel has not been initialized");
     }
 
-    _before_event.record(stream);
-    _current_kernel.launch(stream, problem_size, args);
-    _after_event.record(stream);
+    before_event_.record(stream);
+    current_kernel_.launch(stream, problem_size, args);
+    after_event_.record(stream);
 
     uint64_t workload = problem_size.x * problem_size.y * problem_size.z;
-    _current_workload += workload;
+    current_workload_ += workload;
 }
 
 void RawTuneKernel::next_configuration() {
-    if (_state == state_init) {
-        if (!_strategy->init(*_builder, _current_config)) {
+    if (state_ == state_init) {
+        if (!strategy_->init(*builder_, current_config_)) {
             throw std::runtime_error("search strategy failed to initialize");
         }
-    } else if (_state == state_tuning) {
-        double performance = _current_time / _current_workload;
+    } else if (state_ == state_tuning) {
+        double performance = current_time_ / current_workload_;
 
-        if (performance < _best_performance) {
-            _best_kernel = std::exchange(_current_kernel, {});
-            _best_performance = performance;
+        if (performance < best_performance_) {
+            best_kernel_ = std::exchange(current_kernel_, {});
+            best_performance_ = performance;
         }
 
-        if (!_strategy->submit(performance, _current_config)) {
-            _state = state_finished;
-            _builder.reset();
-            _strategy.reset();
-            _compiler.reset();
+        if (!strategy_->submit(performance, current_config_)) {
+            state_ = state_finished;
+            builder_.reset();
+            strategy_.reset();
+            compiler_.reset();
             return;
         }
     }
 
-    _state = state_compiling;
-    _current_kernel =
-        _builder->compile(_current_config, _parameter_types, *_compiler);
-    _current_workload = 0;
-    _current_time = 0;
+    state_ = state_compiling;
+    current_kernel_ =
+        builder_->compile(current_config_, parameter_types_, *compiler_);
+    current_workload_ = 0;
+    current_time_ = 0;
 }
 
 }  // namespace kernel_launcher

@@ -5,28 +5,28 @@
 namespace kernel_launcher {
 
 bool RawKernel::ready() const {
-    return _ready
-        || (_future.valid()
-            && _future.wait_for(std::chrono::seconds(0))
+    return ready_
+        || (future_.valid()
+            && future_.wait_for(std::chrono::seconds(0))
                 == std::future_status::ready);
 }
 
 void RawKernel::wait_ready() const {
-    return _future.wait();
+    return future_.wait();
 }
 
 void RawKernel::launch(cudaStream_t stream, dim3 problem_size, void** args) {
-    if (!_ready) {
-        _ready = true;
-        _module = _future.get();
+    if (!ready_) {
+        ready_ = true;
+        module_ = future_.get();
     }
 
     dim3 grid_size = {
-        div_ceil(problem_size.x, _grid_divisor.x),
-        div_ceil(problem_size.y, _grid_divisor.y),
-        div_ceil(problem_size.z, _grid_divisor.z)};
+        div_ceil(problem_size.x, grid_divisor_.x),
+        div_ceil(problem_size.y, grid_divisor_.y),
+        div_ceil(problem_size.z, grid_divisor_.z)};
 
-    return _module.launch(grid_size, _block_size, _shared_mem, stream, args);
+    return module_.launch(grid_size, block_size_, shared_mem_, stream, args);
 }
 
 KernelBuilder& KernelBuilder::block_size(
@@ -34,9 +34,9 @@ KernelBuilder& KernelBuilder::block_size(
     Expr<uint32_t> y,
     Expr<uint32_t> z) {
     grid_divisors(x, y, z);
-    _block_size[0] = std::move(x);
-    _block_size[1] = std::move(y);
-    _block_size[2] = std::move(z);
+    block_size_[0] = std::move(x);
+    block_size_[1] = std::move(y);
+    block_size_[2] = std::move(z);
     return *this;
 }
 
@@ -44,40 +44,40 @@ KernelBuilder& KernelBuilder::grid_divisors(
     Expr<uint32_t> x,
     Expr<uint32_t> y,
     Expr<uint32_t> z) {
-    _grid_divisors[0] = std::move(x);
-    _grid_divisors[1] = std::move(y);
-    _grid_divisors[2] = std::move(z);
+    grid_divisors_[0] = std::move(x);
+    grid_divisors_[1] = std::move(y);
+    grid_divisors_[2] = std::move(z);
     return *this;
 }
 
 KernelBuilder& KernelBuilder::shared_memory(Expr<uint32_t> s) {
-    _shared_mem = std::move(s);
+    shared_mem_ = std::move(s);
     return *this;
 }
 
 KernelBuilder& KernelBuilder::template_arg(Expr<TemplateArg> arg) {
-    _template_args.emplace_back(std::move(arg));
+    template_args_.emplace_back(std::move(arg));
     return *this;
 }
 
 KernelBuilder& KernelBuilder::compiler_flag(Expr<std::string> opt) {
-    _compile_flags.emplace_back(std::move(opt));
+    compile_flags_.emplace_back(std::move(opt));
     return *this;
 }
 
 KernelBuilder&
 KernelBuilder::define(std::string name, Expr<std::string> value) {
-    if (_defines.find(name) != _defines.end()) {
+    if (defines_.find(name) != defines_.end()) {
         throw std::runtime_error("variable already defined: " + name);
     }
 
-    _defines.insert({std::move(name), std::move(value)});
+    defines_.insert({std::move(name), std::move(value)});
     return *this;
 }
 
 KernelBuilder& KernelBuilder::assertion(Expr<bool> fun) {
     restrict(fun);
-    _assertions.emplace_back(std::move(fun));
+    assertions_.emplace_back(std::move(fun));
     return *this;
 }
 
@@ -113,23 +113,23 @@ RawKernel KernelBuilder::compile(
     const Compiler& compiler) const {
     Eval eval = {config.get()};
 
-    for (const auto& p : _assertions) {
+    for (const auto& p : assertions_) {
         if (!eval(p)) {
             throw std::runtime_error("assertion failed: " + p.to_string());
         }
     }
 
     std::vector<TemplateArg> template_args;
-    for (const auto& p : _template_args) {
+    for (const auto& p : template_args_) {
         template_args.push_back(eval(p));
     }
 
     std::vector<std::string> options;
-    for (const auto& p : _compile_flags) {
+    for (const auto& p : compile_flags_) {
         options.push_back(eval(p));
     }
 
-    for (const auto& p : _defines) {
+    for (const auto& p : defines_) {
         options.push_back("--define-macro");
         options.push_back(p.first + "=" + eval(p.second));
     }
@@ -138,20 +138,20 @@ RawKernel KernelBuilder::compile(
     options.push_back("-Dkernel_tuner=1");
 
     dim3 block_size = {
-        eval(_block_size[0]),
-        eval(_block_size[1]),
-        eval(_block_size[2])};
+        eval(block_size_[0]),
+        eval(block_size_[1]),
+        eval(block_size_[2])};
 
     dim3 grid_divisor = {
-        eval(_grid_divisors[0]),
-        eval(_grid_divisors[1]),
-        eval(_grid_divisors[2])};
+        eval(grid_divisors_[0]),
+        eval(grid_divisors_[1]),
+        eval(grid_divisors_[2])};
 
-    uint32_t shared_mem = eval(_shared_mem);
+    uint32_t shared_mem = eval(shared_mem_);
 
     std::future<CudaModule> module = compiler.compile(
-        _kernel_source,
-        _kernel_name,
+        kernel_source_,
+        kernel_name_,
         template_args,
         parameter_types,
         options,
@@ -164,31 +164,31 @@ nlohmann::json KernelBuilder::to_json() const {
     using nlohmann::json;
     json result = ConfigSpace::to_json();
 
-    result["kernel_name"] = _kernel_name;
+    result["kernel_name"] = kernel_name_;
     result["block_size"] = {
-        _block_size[0].to_json(),
-        _block_size[1].to_json(),
-        _block_size[2].to_json()};
+        block_size_[0].to_json(),
+        block_size_[1].to_json(),
+        block_size_[2].to_json()};
     result["grid_divisors"] = {
-        _grid_divisors[0].to_json(),
-        _grid_divisors[1].to_json(),
-        _grid_divisors[2].to_json()};
-    result["shared_mem"] = _shared_mem.to_json();
+        grid_divisors_[0].to_json(),
+        grid_divisors_[1].to_json(),
+        grid_divisors_[2].to_json()};
+    result["shared_mem"] = shared_mem_.to_json();
 
     std::vector<json> template_args;
-    for (const auto& p : _template_args) {
+    for (const auto& p : template_args_) {
         template_args.push_back(p.to_json());
     }
     result["template_arg"] = template_args;
 
     std::vector<json> compile_flags;
-    for (const auto& p : _compile_flags) {
+    for (const auto& p : compile_flags_) {
         compile_flags.push_back(p.to_json());
     }
     result["compile_flags"] = compile_flags;
 
     std::unordered_map<std::string, json> defines;
-    for (const auto& d : _defines) {
+    for (const auto& d : defines_) {
         defines[d.first] = d.second.to_json();
     }
     result["defines"] = defines;

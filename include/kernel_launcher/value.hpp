@@ -28,8 +28,8 @@ struct TunableValue {
     TunableValue() {}
 
     TunableValue(std::string value) :
-        _type(type_string),
-        _string_val(std::move(value)) {}
+        type_(type_string),
+        string_val_(std::move(value)) {}
 
     TunableValue(const char* value) : TunableValue(std::string(value)) {}
 
@@ -37,22 +37,22 @@ struct TunableValue {
 
     TunableValue(TemplateArg t) : TunableValue(t.get()) {}
 
-    TunableValue(double i) : _type(type_double), _double_val(i) {}
+    TunableValue(double i) : type_(type_double), double_val_(i) {}
 
-    TunableValue(float i) : _type(type_double), _double_val(i) {}
+    TunableValue(float i) : type_(type_double), double_val_(i) {}
 
     ~TunableValue() {
         clear();
     }
 
     void clear() {
-        auto old_type = _type;
-        _type = type_empty;
+        auto oldtype_ = type_;
+        type_ = type_empty;
 
-        switch (old_type) {
+        switch (oldtype_) {
             case type_string:
                 using std::string;
-                _string_val.~string();
+                string_val_.~string();
                 break;
             case type_bool:
             case type_int:
@@ -69,20 +69,20 @@ struct TunableValue {
 
     TunableValue& operator=(const TunableValue& val) {
         clear();
-        _type = val._type;
+        type_ = val.type_;
 
-        switch (_type) {
+        switch (type_) {
             case type_double:
-                _double_val = val._double_val;
+                double_val_ = val.double_val_;
                 break;
             case type_int:
-                _int_val = val._int_val;
+                int_val_ = val.int_val_;
                 break;
             case type_string:
-                _string_val = val._string_val;
+                string_val_ = val.string_val_;
                 break;
             case type_bool:
-                _bool_val = val._bool_val;
+                bool_val_ = val.bool_val_;
                 break;
             case type_empty:
                 break;
@@ -92,28 +92,28 @@ struct TunableValue {
     }
 
     bool operator==(const TunableValue& that) const {
-        if (this->_type != that._type) {
+        if (this->type_ != that.type_) {
             return false;
         }
 
-        switch (_type) {
+        switch (type_) {
             case type_empty:
                 return true;
             case type_int:
-                return this->_int_val == that._int_val;
+                return this->int_val_ == that.int_val_;
             case type_double:
-                return this->_double_val == that._double_val;
+                return this->double_val_ == that.double_val_;
             case type_string:
-                return this->_string_val == that._string_val;
+                return this->string_val_ == that.string_val_;
             case type_bool:
-                return this->_bool_val == that._bool_val;
+                return this->bool_val_ == that.bool_val_;
             default:
                 return false;
         }
     }
 
     bool is_empty() const {
-        return _type == type_empty;
+        return type_ == type_empty;
     }
 
     bool is_string() const {
@@ -121,22 +121,22 @@ struct TunableValue {
     }
 
     std::string to_string() const {
-        switch (_type) {
+        switch (type_) {
             case type_int:
-                return std::to_string(_int_val);
+                return std::to_string(int_val_);
             case type_double:
-                return std::to_string(_double_val);
+                return std::to_string(double_val_);
             case type_string:
-                return _string_val;
+                return string_val_;
             case type_bool:
-                return _bool_val ? "true" : "false";
+                return bool_val_ ? "true" : "false";
             default:
                 return "";
         }
     }
 
     bool is_double() const {
-        return _type == type_double;
+        return type_ == type_double;
     }
 
     bool is_float() const {
@@ -144,9 +144,9 @@ struct TunableValue {
     }
 
     double to_double() const {
-        switch (_type) {
+        switch (type_) {
             case type_double:
-                return _double_val;
+                return double_val_;
             default:
                 throw CastException(*this, type_of<double>());
         }
@@ -169,21 +169,21 @@ struct TunableValue {
     }
 
     bool operator<(const TunableValue& that) const {
-        if (this->_type != that._type) {
-            return this->_type < that._type;
+        if (this->type_ != that.type_) {
+            return this->type_ < that.type_;
         }
 
-        switch (_type) {
+        switch (type_) {
             case type_empty:
                 return false;
             case type_int:
-                return this->_int_val < that._int_val;
+                return this->int_val_ < that.int_val_;
             case type_double:
-                return this->_double_val < that._double_val;
+                return this->double_val_ < that.double_val_;
             case type_string:
-                return this->_string_val < that._string_val;
+                return this->string_val_ < that.string_val_;
             case type_bool:
-                return this->_bool_val < that._bool_val;
+                return this->bool_val_ < that.bool_val_;
             default:
                 return false;
         }
@@ -214,15 +214,15 @@ struct TunableValue {
     nlohmann::json to_json() const {
         using nlohmann::json;
 
-        switch (_type) {
+        switch (type_) {
             case type_int:
-                return _int_val;
+                return int_val_;
             case type_double:
-                return _double_val;
+                return double_val_;
             case type_string:
-                return _string_val;
+                return string_val_;
             case type_bool:
-                return _bool_val;
+                return bool_val_;
             case type_empty:
                 break;  // fallthrough
         }
@@ -289,20 +289,20 @@ struct TunableValue {
 
 #define FOR_INTEGER(type, human_name)                               \
   public:                                                           \
-    TunableValue(type i) : _type(type_int), _int_val(i) {}          \
+    TunableValue(type i) : type_(type_int), int_val_(i) {}          \
     bool is_##human_name() const {                                  \
-        if (_type == type_bool) {                                   \
+        if (type_ == type_bool) {                                   \
             return true;                                            \
-        } else if (_type == type_int && in_range<type>(_int_val)) { \
+        } else if (type_ == type_int && in_range<type>(int_val_)) { \
             return true;                                            \
         }                                                           \
         return false;                                               \
     }                                                               \
     type to_##human_name() const {                                  \
-        if (_type == type_bool) {                                   \
-            return (type)_bool_val;                                 \
-        } else if (_type == type_int && in_range<type>(_int_val)) { \
-            return (type)_int_val;                                  \
+        if (type_ == type_bool) {                                   \
+            return (type)bool_val_;                                 \
+        } else if (type_ == type_int && in_range<type>(int_val_)) { \
+            return (type)int_val_;                                  \
         }                                                           \
         throw CastException(*this, type_of<type>());                \
     }                                                               \
@@ -338,13 +338,13 @@ struct TunableValue {
         type_double,
         type_string,
         type_bool,
-    } _type = type_empty;
+    } type_ = type_empty;
 
     union {
-        intmax_t _int_val;
-        double _double_val;
-        bool _bool_val;
-        std::string _string_val;
+        intmax_t int_val_;
+        double double_val_;
+        bool bool_val_;
+        std::string string_val_;
     };
 };
 

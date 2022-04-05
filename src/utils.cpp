@@ -36,6 +36,6 @@ static const std::string& demangle_type_info(const std::type_info& type) {
 }
 
 const std::string& Type::name() const {
-    return demangle_type_info(_inner);
+    return demangle_type_info(inner_);
 }
 }  // namespace kernel_launcher

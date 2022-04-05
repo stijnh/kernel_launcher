@@ -21,11 +21,11 @@ struct CuException: std::runtime_error {
         int line);
 
     CUresult error() const {
-        return _err;
+        return err_;
     }
 
   private:
-    CUresult _err;
+    CUresult err_;
 };
 
 #define KERNEL_LAUNCHER_ASSERT(expr) \
@@ -56,20 +56,20 @@ struct CudaModule {
     }
 
     CudaModule& operator=(CudaModule&& that) noexcept {
-        std::swap(that._module, _module);
-        std::swap(that._function, _function);
+        std::swap(that.module_, module_);
+        std::swap(that.function_, function_);
         return *this;
     }
 
     CudaModule(const char* image, const char* symbol) {
         KERNEL_LAUNCHER_ASSERT(
-            cuModuleLoadDataEx(&_module, image, 0, nullptr, nullptr));
+            cuModuleLoadDataEx(&module_, image, 0, nullptr, nullptr));
         KERNEL_LAUNCHER_ASSERT(
-            cuModuleGetFunction(&_function, _module, symbol));
+            cuModuleGetFunction(&function_, module_, symbol));
     }
 
     bool valid() const {
-        return _module != nullptr;
+        return module_ != nullptr;
     }
 
     void launch(
@@ -79,7 +79,7 @@ struct CudaModule {
         CUstream stream,
         void** args) const {
         KERNEL_LAUNCHER_ASSERT(cuLaunchKernel(
-            _function,
+            function_,
             grid.x,
             grid.y,
             grid.z,
@@ -95,15 +95,15 @@ struct CudaModule {
 
     ~CudaModule() {
         if (valid()) {
-            cuModuleUnload(_module);
-            _module = nullptr;
-            _function = nullptr;
+            cuModuleUnload(module_);
+            module_ = nullptr;
+            function_ = nullptr;
         }
     }
 
   private:
-    CUmodule _module = nullptr;
-    CUfunction _function = nullptr;
+    CUmodule module_ = nullptr;
+    CUfunction function_ = nullptr;
 };
 
 struct CudaEvent {
@@ -115,51 +115,51 @@ struct CudaEvent {
     }
 
     CudaEvent& operator=(CudaEvent&& that) noexcept {
-        std::swap(that._event, _event);
+        std::swap(that.event_, event_);
         return *this;
     }
 
     CudaEvent(unsigned int flags = CU_EVENT_DEFAULT) {
-        KERNEL_LAUNCHER_ASSERT(cuEventCreate(&_event, flags));
+        KERNEL_LAUNCHER_ASSERT(cuEventCreate(&event_, flags));
     }
 
     CUevent get() const {
-        return _event;
+        return event_;
     }
 
     operator CUevent() const {
-        return _event;
+        return event_;
     }
 
     void synchronize() const {
-        KERNEL_LAUNCHER_ASSERT(cuEventSynchronize(_event));
+        KERNEL_LAUNCHER_ASSERT(cuEventSynchronize(event_));
     }
 
     void record(CUstream stream) const {
-        KERNEL_LAUNCHER_ASSERT(cuEventRecord(_event, stream));
+        KERNEL_LAUNCHER_ASSERT(cuEventRecord(event_, stream));
     }
 
     float seconds_elapsed_since(CUevent before) const {
         float time = 1337;
-        KERNEL_LAUNCHER_ASSERT(cuEventElapsedTime(&time, before, _event));
+        KERNEL_LAUNCHER_ASSERT(cuEventElapsedTime(&time, before, event_));
         return time / 1000;  // milliseconds to seconds
     }
 
     ~CudaEvent() {
-        if (_event) {
-            KERNEL_LAUNCHER_ASSERT(cuEventSynchronize(_event));
-            KERNEL_LAUNCHER_ASSERT(cuEventDestroy(_event));
-            _event = nullptr;
+        if (event_) {
+            KERNEL_LAUNCHER_ASSERT(cuEventSynchronize(event_));
+            KERNEL_LAUNCHER_ASSERT(cuEventDestroy(event_));
+            event_ = nullptr;
         }
     }
 
   private:
-    CUevent _event = nullptr;
+    CUevent event_ = nullptr;
 };
 
 struct CudaDevice {
     CudaDevice() = default;
-    explicit CudaDevice(CUdevice d) : _device(d) {}
+    explicit CudaDevice(CUdevice d) : device_(d) {}
 
     static int count() {
         int n;
@@ -175,12 +175,12 @@ struct CudaDevice {
 
     std::string name() const {
         char name[1024];
-        KERNEL_LAUNCHER_ASSERT(cuDeviceGetName(name, sizeof(name), _device));
+        KERNEL_LAUNCHER_ASSERT(cuDeviceGetName(name, sizeof(name), device_));
         return name;
     }
 
     CUdevice get() const {
-        return _device;
+        return device_;
     }
 
     operator CUdevice() const {
@@ -188,7 +188,7 @@ struct CudaDevice {
     }
 
   private:
-    CUdevice _device = -1;
+    CUdevice device_ = -1;
 };
 
 namespace detail {
@@ -246,25 +246,25 @@ struct Memory;
 template<typename T = char>
 struct MemoryView {
     MemoryView() {
-        _device_ptr = nullptr;
-        _size = 0;
+        device_ptr_ = nullptr;
+        size_ = 0;
     }
 
     MemoryView(const MemoryView<T>& mem) {
-        _device_ptr = (T*)mem.data();
-        _size = mem.size();
+        device_ptr_ = (T*)mem.data();
+        size_ = mem.size();
     }
 
     MemoryView(const Memory<T>& mem) {
-        _device_ptr = (T*)mem.data();
-        _size = mem.size();
+        device_ptr_ = (T*)mem.data();
+        size_ = mem.size();
     }
 
     MemoryView(Memory<T>&& mem) = delete;
 
     MemoryView(T* device_ptr, size_t n) {
-        _device_ptr = device_ptr;
-        _size = n;
+        device_ptr_ = device_ptr;
+        size_ = n;
     }
 
     void copy_to(MemoryView<T> m) const {
@@ -273,8 +273,8 @@ struct MemoryView {
         }
 
         KERNEL_LAUNCHER_ASSERT(cuMemcpy(
-            (CUdeviceptr)m._device_ptr,
-            (CUdeviceptr)this->_device_ptr,
+            (CUdeviceptr)m.device_ptr_,
+            (CUdeviceptr)this->device_ptr_,
             this->size_in_bytes()));
     }
 
@@ -305,11 +305,11 @@ struct MemoryView {
     }
 
     T* data() {
-        return _device_ptr;
+        return device_ptr_;
     }
 
     const T* data() const {
-        return _device_ptr;
+        return device_ptr_;
     }
 
     operator T*() {
@@ -321,19 +321,19 @@ struct MemoryView {
     }
 
     size_t size() const {
-        return _size;
+        return size_;
     }
 
     size_t size_in_bytes() const {
-        return _size * sizeof(T);
+        return size_ * sizeof(T);
     }
 
     MemoryView<T> slice(size_t start, size_t len) const {
-        if (start + len >= _size) {  // TODO check overflow
+        if (start + len >= size_) {  // TODO check overflow
             throw std::runtime_error("index out of bounds");
         }
 
-        return MemoryView(_device_ptr + start, len);
+        return MemoryView(device_ptr_ + start, len);
     }
 
     Memory<T> clone() const {
@@ -343,16 +343,16 @@ struct MemoryView {
     }
 
     void fill(T value) {
-        detail::MemoryFill<T>::call(_device_ptr, _size, value);
+        detail::MemoryFill<T>::call(device_ptr_, size_, value);
     }
 
     void fill_zeros() {
-        detail::MemoryFill<char>::call((char*)_device_ptr, size_in_bytes(), 0);
+        detail::MemoryFill<char>::call((char*)device_ptr_, size_in_bytes(), 0);
     }
 
   protected:
-    T* _device_ptr;
-    size_t _size;
+    T* device_ptr_;
+    size_t size_;
 };
 
 template<typename T>
@@ -374,8 +374,8 @@ struct Memory: MemoryView<T> {
     }
 
     Memory& operator=(Memory&& that) noexcept {
-        std::swap(this->_device_ptr, that._device_ptr);
-        std::swap(this->_size, that._size);
+        std::swap(this->device_ptr_, that.device_ptr_);
+        std::swap(this->size_, that.size_);
     }
 
     explicit Memory(size_t n) {
@@ -402,21 +402,21 @@ struct Memory: MemoryView<T> {
 
         if (n > 0) {
             KERNEL_LAUNCHER_ASSERT(
-                cuMemAlloc((CUdeviceptr*)&(this->_device_ptr), n * sizeof(T)));
-            this->_size = n;
+                cuMemAlloc((CUdeviceptr*)&(this->device_ptr_), n * sizeof(T)));
+            this->size_ = n;
         }
     }
 
     void free() {
-        if (this->_device_ptr) {
-            KERNEL_LAUNCHER_ASSERT(cuMemFree((CUdeviceptr)this->_device_ptr));
-            this->_device_ptr = nullptr;
-            this->_size = 0;
+        if (this->device_ptr_) {
+            KERNEL_LAUNCHER_ASSERT(cuMemFree((CUdeviceptr)this->device_ptr_));
+            this->device_ptr_ = nullptr;
+            this->size_ = 0;
         }
     }
 
     MemoryView<T> view() const {
-        return MemoryView<T>(this->_device_ptr, this->_size);
+        return MemoryView<T>(this->device_ptr_, this->size_);
     }
 };
 

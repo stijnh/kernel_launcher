@@ -8,9 +8,9 @@
 namespace kernel_launcher {
 
 const TunableValue& Config::at(const TunableParam& param) const {
-    auto it = _inner.find(param);
+    auto it = inner_.find(param);
 
-    if (it == _inner.end()) {
+    if (it == inner_.end()) {
         throw std::runtime_error(
             std::string("unknown parameter: ") + param.name());
     }
@@ -19,17 +19,17 @@ const TunableValue& Config::at(const TunableParam& param) const {
 }
 
 const std::unordered_map<TunableParam, TunableValue>& Config::get() const {
-    return _inner;
+    return inner_;
 }
 
 void Config::insert(TunableParam p, TunableValue v) {
-    _inner[std::move(p)] = std::move(v);
+    inner_[std::move(p)] = std::move(v);
 }
 
 nlohmann::json Config::to_json() const {
     std::unordered_map<std::string, nlohmann::json> results;
 
-    for (const auto& p : _inner) {
+    for (const auto& p : inner_) {
         results[p.first.name()] = p.second.to_json();
     }
 
@@ -45,17 +45,17 @@ TunableParam ConfigSpace::create_param(
     Type type,
     std::vector<TunableValue> values) {
     TunableParam p = TunableParam(name, type);
-    _params.insert({p, std::move(values)});
+    params_.insert({p, std::move(values)});
     return p;
 }
 
 void ConfigSpace::restrict(Expr<bool> expr) {
-    _restrictions.push_back(std::move(expr));
+    restrictions_.push_back(std::move(expr));
 }
 
 size_t ConfigSpace::size() const {
     size_t n = 1;
-    for (const auto& p : _params) {
+    for (const auto& p : params_) {
         size_t k = p.second.size();
         if (k == 0)
             return 0;
@@ -72,7 +72,7 @@ size_t ConfigSpace::size() const {
 }
 
 bool ConfigSpace::get(size_t index, Config& config) const {
-    for (const auto& p : _params) {
+    for (const auto& p : params_) {
         size_t n = p.second.size();
         size_t i = index % n;
         index /= n;
@@ -86,7 +86,7 @@ bool ConfigSpace::get(size_t index, Config& config) const {
 bool ConfigSpace::is_valid(const Config& config) const {
     Eval eval = {config.get()};
 
-    for (const auto& r : _restrictions) {
+    for (const auto& r : restrictions_) {
         if (!eval(r)) {
             return false;
         }
@@ -118,7 +118,7 @@ Config ConfigSpace::sample() const {
 Config ConfigSpace::load_config(const nlohmann::json& obj) const {
     Config config;
 
-    for (const auto& p : _params) {
+    for (const auto& p : params_) {
         const TunableParam& param = p.first;
         const std::vector<TunableValue>& valid_values = p.second;
 
@@ -137,7 +137,7 @@ Config ConfigSpace::load_config(const nlohmann::json& obj) const {
     }
 
     Eval eval = {config.get()};
-    for (const auto& r : _restrictions) {
+    for (const auto& r : restrictions_) {
         if (!eval(r)) {
             throw std::runtime_error(
                 "config does not pass restriction: " + r.to_string());
@@ -148,7 +148,7 @@ Config ConfigSpace::load_config(const nlohmann::json& obj) const {
 }
 
 const TunableParam& ConfigSpace::at(std::string& s) const {
-    for (const auto& p : _params) {
+    for (const auto& p : params_) {
         if (p.first.name() == s) {
             return p.first;
         }
@@ -166,7 +166,7 @@ nlohmann::json ConfigSpace::to_json() const {
     json results = json::object();
 
     std::unordered_map<std::string, json> params;
-    for (const auto& p : _params) {
+    for (const auto& p : params_) {
         std::vector<json> values;
         for (const auto& v : p.second) {
             values.push_back(v.to_json());
@@ -177,7 +177,7 @@ nlohmann::json ConfigSpace::to_json() const {
     results["parameters"] = params;
 
     std::vector<json> restrictions;
-    for (const auto& d : _restrictions) {
+    for (const auto& d : restrictions_) {
         restrictions.push_back(d.to_json());
     }
     results["restrictions"] = restrictions;
@@ -186,19 +186,19 @@ nlohmann::json ConfigSpace::to_json() const {
 }
 
 void ConfigIterator::reset() {
-    _attempts = range(_space.size());
+    attempts_ = range(space_.size());
 
     std::random_device device;
     std::default_random_engine rng {device()};
-    std::shuffle(_attempts.begin(), _attempts.end(), rng);
+    std::shuffle(attempts_.begin(), attempts_.end(), rng);
 }
 
 bool ConfigIterator::next(Config& config) {
-    while (!_attempts.empty()) {
-        size_t index = _attempts.back();
-        _attempts.pop_back();
+    while (!attempts_.empty()) {
+        size_t index = attempts_.back();
+        attempts_.pop_back();
 
-        if (_space.get(index, config)) {
+        if (space_.get(index, config)) {
             return true;
         }
     }

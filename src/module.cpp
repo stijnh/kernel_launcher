@@ -32,6 +32,6 @@ CuException::CuException(
     const char* filename,
     int line) :
     std::runtime_error(cu_error_message(err, message, filename, line)),
-    _err(err) {};
+    err_(err) {};
 
 }  // namespace kernel_launcher

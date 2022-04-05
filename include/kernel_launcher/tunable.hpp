@@ -16,11 +16,11 @@ struct RandomStrategy: TuningStrategy {
     bool submit(double performance, Config& config) override;
 
   private:
-    ConfigIterator _iter;
+    ConfigIterator iter_;
 };
 
 struct TuningCache {
-    TuningCache(std::string filename) : _filename(std::move(filename)) {
+    TuningCache(std::string filename) : filename_(std::move(filename)) {
         //
     }
 
@@ -29,17 +29,17 @@ struct TuningCache {
     bool find(const Config& config, double& performance) const;
 
   private:
-    bool _initialized = false;
-    std::string _filename;
-    std::unordered_map<std::string, double> _cache {};
-    std::vector<TunableParam> _parameters {};
+    bool initialized_ = false;
+    std::string filename_;
+    std::unordered_map<std::string, double> cache_ {};
+    std::vector<TunableParam> parameters_ {};
 };
 
 struct CachingStrategy: TuningStrategy {
     template<typename T>
     CachingStrategy(std::string filename, T inner = {}) :
-        _inner(std::make_unique<std::decay_t<T>>(std::forward<T>(inner))),
-        _cache(std::move(filename)) {
+        inner_(std::make_unique<std::decay_t<T>>(std::forward<T>(inner))),
+        cache_(std::move(filename)) {
         //
     }
 
@@ -47,14 +47,14 @@ struct CachingStrategy: TuningStrategy {
     bool submit(double performance, Config& config) override;
 
   private:
-    std::unique_ptr<TuningStrategy> _inner;
-    TuningCache _cache;
-    bool _first_run;
-    Config _first_config;
+    std::unique_ptr<TuningStrategy> inner_;
+    TuningCache cache_;
+    bool first_run_;
+    Config first_config_;
 };
 
 struct RawTuneKernel {
-    RawTuneKernel() : _state(state_uninitialized) {
+    RawTuneKernel() : state_(state_uninitialized) {
         //
     }
 
@@ -63,17 +63,17 @@ struct RawTuneKernel {
         std::vector<Type> parameter_types,
         std::unique_ptr<Compiler> compiler = {},
         std::unique_ptr<TuningStrategy> strategy = {}) :
-        _state(state_init),
-        _builder(std::make_unique<KernelBuilder>(std::move(builder))),
-        _strategy(std::move(strategy)),
-        _compiler(std::move(compiler)),
-        _parameter_types(std::move(parameter_types)) {
-        if (!_strategy) {
-            _strategy = std::make_unique<RandomStrategy>();
+        state_(state_init),
+        builder_(std::make_unique<KernelBuilder>(std::move(builder))),
+        strategy_(std::move(strategy)),
+        compiler_(std::move(compiler)),
+        parameter_types_(std::move(parameter_types)) {
+        if (!strategy_) {
+            strategy_ = std::make_unique<RandomStrategy>();
         }
 
-        if (!_compiler) {
-            _compiler = std::make_unique<NvrtcCompiler>();
+        if (!compiler_) {
+            compiler_ = std::make_unique<NvrtcCompiler>();
         }
 
         next_configuration();
@@ -90,24 +90,24 @@ struct RawTuneKernel {
         state_tuning,
         state_compiling,
         state_finished,
-    } _state;
+    } state_;
 
-    std::unique_ptr<KernelBuilder> _builder;
-    std::unique_ptr<TuningStrategy> _strategy;
-    std::unique_ptr<Compiler> _compiler;
-    std::vector<Type> _parameter_types;
+    std::unique_ptr<KernelBuilder> builder_;
+    std::unique_ptr<TuningStrategy> strategy_;
+    std::unique_ptr<Compiler> compiler_;
+    std::vector<Type> parameter_types_;
 
-    CudaEvent _before_event;
-    CudaEvent _after_event;
+    CudaEvent before_event_;
+    CudaEvent after_event_;
 
-    double _best_performance = 1e9;
-    RawKernel _best_kernel;
+    double best_performance_ = 1e9;
+    RawKernel best_kernel_;
 
-    Config _current_config;
-    double _current_time = 0;
-    uint64_t _current_workload = 0;
-    RawKernel _current_kernel;
-    bool _first_run;
+    Config current_config_;
+    double current_time_ = 0;
+    uint64_t current_workload_ = 0;
+    RawKernel current_kernel_;
+    bool first_run_;
 };
 
 template<typename... Args>
@@ -120,14 +120,14 @@ struct TuneKernel {
         KernelBuilder builder,
         std::unique_ptr<TuningStrategy> strategy = {},
         std::unique_ptr<Compiler> compiler = {}) :
-        _kernel(
+        kernel_(
             std::move(builder),
             {type_of<Args>()...},
             std::move(compiler),
             std::move(strategy)) {}
 
     instance_type instantiate(cudaStream_t stream, dim3 problem_size) {
-        return instance_type(stream, problem_size, _kernel);
+        return instance_type(stream, problem_size, kernel_);
     }
 
     instance_type operator()(cudaStream_t stream, dim3 problem_size) {
@@ -151,6 +151,6 @@ struct TuneKernel {
         return instantiate(nullptr, dim3(problem_x, problem_y, problem_z));
     }
 
-    RawTuneKernel _kernel;
+    RawTuneKernel kernel_;
 };
 }  // namespace kernel_launcher

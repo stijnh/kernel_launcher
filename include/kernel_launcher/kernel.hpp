@@ -20,37 +20,37 @@ struct RawKernel {
         dim3 block_size,
         dim3 grid_divisor,
         uint32_t shared_mem) :
-        _future(std::move(future)),
-        _block_size(block_size),
-        _grid_divisor(grid_divisor),
-        _shared_mem(shared_mem) {}
+        future_(std::move(future)),
+        block_size_(block_size),
+        grid_divisor_(grid_divisor),
+        shared_mem_(shared_mem) {}
 
     bool ready() const;
     void wait_ready() const;
     void launch(cudaStream_t stream, dim3 problem_size, void** args);
 
   private:
-    bool _ready = false;
-    std::future<CudaModule> _future;
-    CudaModule _module;
-    dim3 _block_size = 0;
-    dim3 _grid_divisor = 0;
-    uint32_t _shared_mem = 0;
+    bool ready_ = false;
+    std::future<CudaModule> future_;
+    CudaModule module_;
+    dim3 block_size_ = 0;
+    dim3 grid_divisor_ = 0;
+    uint32_t shared_mem_ = 0;
 };
 
 struct KernelBuilder: ConfigSpace {
     KernelBuilder(Source kernel_source, std::string kernel_name) :
-        _kernel_source(std::move(kernel_source)),
-        _kernel_name(std::move(kernel_name)) {
+        kernel_source_(std::move(kernel_source)),
+        kernel_name_(std::move(kernel_name)) {
         //
     }
 
     const std::string& kernel_name() const {
-        return _kernel_name;
+        return kernel_name_;
     }
 
     const Source& kernel_source() const {
-        return _kernel_source;
+        return kernel_source_;
     }
 
     template<typename T>
@@ -118,15 +118,15 @@ struct KernelBuilder: ConfigSpace {
     nlohmann::json to_json() const;
 
   private:
-    Source _kernel_source;
-    std::string _kernel_name;
-    std::array<Expr<uint32_t>, 3> _block_size = {1u, 1u, 1u};
-    std::array<Expr<uint32_t>, 3> _grid_divisors = {1u, 1u, 1u};
-    Expr<uint32_t> _shared_mem = {0u};
-    std::vector<Expr<TemplateArg>> _template_args {};
-    std::vector<Expr<std::string>> _compile_flags {};
-    std::vector<Expr<bool>> _assertions {};
-    std::unordered_map<std::string, Expr<std::string>> _defines {};
+    Source kernel_source_;
+    std::string kernel_name_;
+    std::array<Expr<uint32_t>, 3> block_size_ = {1u, 1u, 1u};
+    std::array<Expr<uint32_t>, 3> grid_divisors_ = {1u, 1u, 1u};
+    Expr<uint32_t> shared_mem_ = {0u};
+    std::vector<Expr<TemplateArg>> template_args_ {};
+    std::vector<Expr<std::string>> compile_flags_ {};
+    std::vector<Expr<bool>> assertions_ {};
+    std::unordered_map<std::string, Expr<std::string>> defines_ {};
 };
 
 template<typename T>
@@ -150,15 +150,15 @@ using kernel_arg_t = typename KernelArg<T>::type;
 template<typename K, typename... Args>
 struct KernelInstantiation {
     KernelInstantiation(cudaStream_t stream, dim3 problem_size, K& kernel) :
-        _stream(stream),
-        _problem_size(problem_size),
-        _kernel(kernel) {
+        stream_(stream),
+        problem_size_(problem_size),
+        kernel_(kernel) {
         //
     }
 
     void launch(kernel_arg_t<Args>... args) {
         std::array<void*, sizeof...(Args)> raw_args = {&args...};
-        _kernel.launch(_stream, _problem_size, raw_args.data());
+        kernel_.launch(stream_, problem_size_, raw_args.data());
     }
 
     void operator()(kernel_arg_t<Args>... args) {
@@ -166,9 +166,9 @@ struct KernelInstantiation {
     }
 
   private:
-    cudaStream_t _stream;
-    dim3 _problem_size;
-    K& _kernel;
+    cudaStream_t stream_;
+    dim3 problem_size_;
+    K& kernel_;
 };
 
 template<typename... Args>
@@ -199,11 +199,11 @@ struct Kernel {
         const KernelBuilder& builder,
         const Config& config,
         const Compiler& compiler = DEFAULT_COMPILER) {
-        _kernel = builder.compile(config, {type_of<Args>()...}, compiler);
+        kernel_ = builder.compile(config, {type_of<Args>()...}, compiler);
     }
 
     instance_type instantiate(cudaStream_t stream, dim3 problem_size) {
-        return instance_type(stream, problem_size, _kernel);
+        return instance_type(stream, problem_size, kernel_);
     }
 
     instance_type operator()(cudaStream_t stream, dim3 problem_size) {
@@ -228,7 +228,7 @@ struct Kernel {
     }
 
   private:
-    RawKernel _kernel;
+    RawKernel kernel_;
 };
 
 }  // namespace kernel_launcher
