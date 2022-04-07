@@ -1,10 +1,8 @@
 #include "kernel_launcher/utils.hpp"
 
-#include "../include/kernel_launcher/utils.hpp"
-
 namespace kernel_launcher {
 
-static const std::string& demangle_type_info(const std::type_info& type) {
+static const char* demangle_type_info(const std::type_info& type) {
     static std::mutex lock = {};
     static std::unordered_map<std::type_index, std::string> demangled_names =
         {};
@@ -13,11 +11,12 @@ static const std::string& demangle_type_info(const std::type_info& type) {
     auto it = demangled_names.find(type);
 
     if (it != demangled_names.end()) {
-        return it->second;
+        return it->second.c_str();
     }
 
     const char* mangled_name = type.name();
     int status = ~0;
+    // TOOD: look into how portable this solution is on different platforms :-/
     char* undecorated_name =
         abi::__cxa_demangle(mangled_name, nullptr, nullptr, &status);
 
@@ -32,10 +31,10 @@ static const std::string& demangle_type_info(const std::type_info& type) {
 
     auto result = demangled_names.insert({type, undecorated_name});
     free(undecorated_name);
-    return result.first->second;
+    return result.first->second.c_str();
 }
 
-const std::string& Type::name() const {
+const char* Type::name() const {
     return demangle_type_info(inner_);
 }
 }  // namespace kernel_launcher

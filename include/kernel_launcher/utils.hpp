@@ -5,6 +5,7 @@
 #include <atomic>
 #include <memory>
 #include <mutex>
+#include <ostream>
 #include <string>
 #include <typeindex>
 #include <unordered_map>
@@ -26,7 +27,7 @@ struct Type {
         return inner_;
     }
 
-    const std::string& name() const;
+    const char* name() const;
 
     bool operator==(const Type& that) {
         return this->inner_ == that.inner_;
@@ -51,12 +52,12 @@ static inline Type type_of(const T&) {
 }
 
 template<typename T>
-static inline const std::string& type_name() {
+static inline const char* type_name() {
     return Type::of<T>().name();
 }
 
 template<typename T>
-static inline const std::string& type_name(const T&) {
+static inline const char* type_name(const T&) {
     return Type::of<T>().name();
 }
 
