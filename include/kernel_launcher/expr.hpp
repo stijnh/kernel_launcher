@@ -42,6 +42,7 @@ template<typename R>
 struct BaseExpr {
     using return_type = R;
 
+    virtual ~BaseExpr() = default;
     virtual std::string to_string() const = 0;
     virtual return_type eval(const Eval& eval) const = 0;
     virtual nlohmann::json to_json() const {

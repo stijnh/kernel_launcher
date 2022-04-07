@@ -81,6 +81,7 @@ struct Compiler {
         const std::vector<Type>& parameter_types,
         const std::vector<std::string>& options,
         CUdevice* device_opt) const = 0;
+    virtual ~Compiler() = default;
 };
 
 struct NvrtcCompiler: Compiler {

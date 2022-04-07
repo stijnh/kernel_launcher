@@ -9,6 +9,7 @@ namespace kernel_launcher {
 struct TuningStrategy {
     virtual bool init(const KernelBuilder& builder, Config& config) = 0;
     virtual bool submit(double performance, Config& config) = 0;
+    virtual ~TuningStrategy() = default;
 };
 
 struct RandomStrategy: TuningStrategy {
