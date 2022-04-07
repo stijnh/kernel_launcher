@@ -96,23 +96,12 @@ bool ConfigSpace::is_valid(const Config& config) const {
 }
 
 Config ConfigSpace::sample() const {
-    size_t n = size();
-    std::random_device rd;
-    std::uniform_int_distribution<size_t> rng(0, n);
-    std::unordered_set<size_t> attempted;
-    Config config;
-
-    while (attempted.size() < n) {
-        size_t i = rng(rd);
-
-        if (attempted.insert(i).second) {
-            if (get(i, config)) {
-                return config;
-            }
-        }
+    Confg config;
+    if (iterate().next(config)) {
+        return config;
+    } else {
+        throw std::runtime_error("no valid configurations found");
     }
-
-    throw std::runtime_error("no valid configurations found");
 }
 
 Config ConfigSpace::load_config(const nlohmann::json& obj) const {
