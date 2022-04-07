@@ -127,6 +127,26 @@ struct TuneKernel {
             std::move(compiler),
             std::move(strategy)) {}
 
+    static TuneKernel load(
+        KernelBuilder builder,
+        std::unique_ptr<TuningStrategy> strategy = {},
+        std::unique_ptr<Compiler> compiler = {}) {
+        return TuneKernel(
+            std::move(builder),
+            std::move(strategy),
+            std::move(compiler));
+    }
+
+    void initialize(
+        KernelBuilder builder,
+        std::unique_ptr<TuningStrategy> strategy = {},
+        std::unique_ptr<Compiler> compiler = {}) {
+        *this = TuneKernel(
+            std::move(builder),
+            std::move(strategy),
+            std::move(compiler));
+    }
+
     instance_type instantiate(cudaStream_t stream, dim3 problem_size) {
         return instance_type(stream, problem_size, kernel_);
     }

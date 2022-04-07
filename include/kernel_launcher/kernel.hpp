@@ -183,10 +183,10 @@ struct Kernel {
         const KernelBuilder& builder,
         const Config& config,
         const Compiler& compiler = DEFAULT_COMPILER) {
-        load(builder, config, compiler);
+        initialize(builder, config, compiler);
     }
 
-    static Kernel<Args...> compile(
+    static Kernel<Args...> load(
         const KernelBuilder& builder,
         const Config& config,
         const Compiler& compiler = DEFAULT_COMPILER) {
@@ -195,7 +195,7 @@ struct Kernel {
         return kernel;
     }
 
-    void load(
+    void initialize(
         const KernelBuilder& builder,
         const Config& config,
         const Compiler& compiler = DEFAULT_COMPILER) {
@@ -224,7 +224,7 @@ struct Kernel {
 
     instance_type
     operator()(uint32_t problem_x, uint32_t problem_y, uint32_t problem_z = 1) {
-        return instantiate(nullptr, dim3(problem_x, problem_y, problem_z));
+        return instantiate(dim3(problem_x, problem_y, problem_z));
     }
 
   private:
