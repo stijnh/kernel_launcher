@@ -39,8 +39,9 @@ struct ConfigSpace {
     template<typename T, typename It>
     ParamExpr<T> tune(std::string name, It begin, It end, T default_value) {
         std::vector<TunableValue> tvalues;
-        for (auto current = begin; current != end; ++current) {
-            tvalues.push_back(*current);
+        for (It current = begin; current != end; ++current) {
+            T value = *current;
+            tvalues.push_back(std::move(value));
         }
 
         return ParamExpr<T>(create_param(
@@ -50,37 +51,39 @@ struct ConfigSpace {
             default_value));
     }
 
-    template<typename T>
+    template<typename Collection, typename T>
     ParamExpr<T>
-    tune(std::string name, const std::vector<T>& values, T default_value) {
+    tune(std::string name, const Collection& values, T default_type) {
         return tune(
             std::move(name),
-            values.begin(),
-            values.end(),
-            std::move(default_value));
+            std::begin(values),
+            std::end(values),
+            std::move(default_type));
     }
 
-    template<typename T>
-    ParamExpr<T> tune(std::string name, const std::vector<T>& values) {
-        return tune(std::move(name), values, values.at(0));
+    template<typename Collection, typename T = typename Collection::value_type>
+    ParamExpr<T> tune(std::string name, const Collection& values) {
+        KERNEL_LAUNCHER_ASSERT(values.begin() != values.end());
+        return tune(std::move(name), values, *values.begin());
     }
 
+    // Special case for initializer_list since it is not recognized by the function above
     template<typename T>
     ParamExpr<T> tune(
         std::string name,
         const std::initializer_list<T>& values,
-        T default_value) {
+        T default_type) {
         return tune(
             std::move(name),
-            values.begin(),
-            values.end(),
-            std::move(default_value));
+            std::begin(values),
+            std::end(values),
+            std::move(default_type));
     }
 
     template<typename T>
     ParamExpr<T>
     tune(std::string name, const std::initializer_list<T>& values) {
-        KERNEL_LAUNCHER_ASSERT(values.size() > 0);
+        KERNEL_LAUNCHER_ASSERT(values.begin() != values.end());
         return tune(std::move(name), values, *values.begin());
     }
 
@@ -88,7 +91,7 @@ struct ConfigSpace {
         return params_;
     }
 
-    const TunableParam& operator[](std::string& s) const {
+    const TunableParam& operator[](const char* s) const {
         return at(s);
     }
 
@@ -97,7 +100,7 @@ struct ConfigSpace {
         Type type,
         std::vector<TunableValue> values,
         TunableValue default_value);
-    const TunableParam& at(std::string& s) const;
+    const TunableParam& at(const char* s) const;
     void restrict(Expr<bool> expr);
     uint64_t size() const;
     bool get(uint64_t index, Config& config) const;

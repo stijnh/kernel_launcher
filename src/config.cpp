@@ -57,7 +57,7 @@ void ConfigSpace::restrict(Expr<bool> expr) {
 uint64_t ConfigSpace::size() const {
     uint64_t n = 1;
     for (const auto& p : params_) {
-        uint64_t k = (uint64_t) p.size();
+        uint64_t k = (uint64_t)p.size();
         if (k == 0)
             return 0;
 
@@ -152,14 +152,14 @@ Config ConfigSpace::load_config(const nlohmann::json& obj) const {
     return config;
 }
 
-const TunableParam& ConfigSpace::at(std::string& s) const {
+const TunableParam& ConfigSpace::at(const char* s) const {
     for (const auto& param : params_) {
         if (param.name() == s) {
             return param;
         }
     }
 
-    throw std::runtime_error("parameter not found: " + s);
+    throw std::runtime_error(std::string("parameter not found: ") + s);
 }
 
 ConfigIterator ConfigSpace::iterate() const {
