@@ -6,7 +6,7 @@
 #include "kernel_launcher.hpp"
 
 namespace kl = kernel_launcher;
-using TF = float;
+using TF = double;
 
 #define CUDA_CHECK(expr)     \
     if (expr != cudaSuccess) \
@@ -44,14 +44,6 @@ int main() {
         .block_size(bx, by)
         .grid_divisors(bx * tx, by * ty);
 
-    {
-        size_t n = 0;
-        kl::Config config;
-        auto it = builder.iterate();
-        while (it.next(config)) n++;
-        std::cout << "config size: " << n << std::endl;
-    }
-
     // Initialize CUDA
     CUDA_CHECK(cudaSetDevice(0));
     CUDA_CHECK(cudaFree(nullptr));
@@ -72,19 +64,20 @@ int main() {
     kl::Memory<TF> dev_A(A);
     kl::Memory<TF> dev_B(B);
     kl::Memory<TF> dev_C(C);
+    dev_C.fill_zeros();
 
     // Compile kernel
-    kl::Config config;
-    kl::Config best_config;
+    std::string cache_file = "matmul_";
+    cache_file += kl::CudaDevice::current().name() + "_" + kl::type_name<TF>() + ".json";
 
-    auto compiler = kl::AsyncCompiler(kl::NvrtcCompiler{});
-    auto strategy = kl::CachingStrategy("matmul.json", kl::RandomStrategy());
+    auto compiler = std::make_unique<kl::AsyncCompiler>(kl::NvrtcCompiler{});
+    auto strategy =  std::make_unique<kl::CachingStrategy>(cache_file, kl::RandomStrategy());
 
     auto kernel = kl::TuneKernel<TF*, const TF*, const TF*>(
             builder,
-            std::make_unique<decltype(strategy)>(std::move(strategy)),
-            std::make_unique<decltype(compiler)>(compiler)
-            );
+            std::move(strategy),
+            std::move(compiler)
+    );
 
     auto t_start = std::chrono::high_resolution_clock::now();
 

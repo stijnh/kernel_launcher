@@ -41,7 +41,7 @@ int main() {
 
     // Compile kernel
     auto config = builder.sample();
-    auto kernel = kl::Kernel<float*,  const float*,  const float*, int>::compile(builder, config);
+    auto kernel = kl::Kernel<float*,  const float*,  const float*, int>::load(builder, config);
 
     // Run kernel
     kernel(n)(dev_C, dev_A, dev_B, n);
