@@ -105,3 +105,22 @@ struct ConfigIterator {
 };
 
 }  // namespace kernel_launcher
+
+namespace std {
+    template<>
+    struct hash<kernel_launcher::Config> {
+        size_t operator()(const kernel_launcher::Config& config) const noexcept {
+            size_t hash = 0;
+
+            for (const auto& p : config.get()) {
+                size_t left = std::hash<std::string> {}(p.first.name());
+                size_t right = std::hash<kernel_launcher::TunableValue> {}(p.second);
+
+                // Combine using XOR to ensure that the order of elements is not important while hashing.
+                hash ^= right + 0x9e3779b9 + (left<<6) + (left>>2); // From BOOST
+            }
+
+            return hash;
+        }
+    };
+}  // namespace std

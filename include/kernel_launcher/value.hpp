@@ -112,6 +112,58 @@ struct TunableValue {
         }
     }
 
+    bool operator!=(const TunableValue& that) const {
+        return !(*this == that);
+    }
+
+    bool operator<(const TunableValue& that) const {
+        if (this->type_ != that.type_) {
+            return this->type_ < that.type_;
+        }
+
+        switch (type_) {
+            case type_empty:
+                return false;
+            case type_int:
+                return this->int_val_ < that.int_val_;
+            case type_double:
+                return this->double_val_ < that.double_val_;
+            case type_string:
+                return this->string_val_ < that.string_val_;
+            case type_bool:
+                return this->bool_val_ < that.bool_val_;
+            default:
+                return false;
+        }
+    }
+
+    bool operator>(const TunableValue& that) const {
+        return that < *this;
+    }
+
+    bool operator<=(const TunableValue& that) const {
+        return *this < that || *this == that;
+    }
+
+    bool operator>=(const TunableValue& that) const {
+        return that <= *this;
+    }
+
+    size_t hash() const {
+        switch (type_) {
+            case type_int:
+                return std::hash<intmax_t>{}(int_val_);
+            case type_double:
+                return std::hash<double>{}(double_val_);
+            case type_string:
+                return std::hash<std::string>{}(string_val_);
+            case type_bool:
+                return std::hash<bool>{}(bool_val_);
+            default:
+                return 0;
+        }
+    }
+
     bool is_empty() const {
         return type_ == type_empty;
     }
@@ -162,43 +214,6 @@ struct TunableValue {
 
     explicit operator float() const {
         return to_float();
-    }
-
-    bool operator!=(const TunableValue& that) const {
-        return !(*this == that);
-    }
-
-    bool operator<(const TunableValue& that) const {
-        if (this->type_ != that.type_) {
-            return this->type_ < that.type_;
-        }
-
-        switch (type_) {
-            case type_empty:
-                return false;
-            case type_int:
-                return this->int_val_ < that.int_val_;
-            case type_double:
-                return this->double_val_ < that.double_val_;
-            case type_string:
-                return this->string_val_ < that.string_val_;
-            case type_bool:
-                return this->bool_val_ < that.bool_val_;
-            default:
-                return false;
-        }
-    }
-
-    bool operator>(const TunableValue& that) const {
-        return that < *this;
-    }
-
-    bool operator<=(const TunableValue& that) const {
-        return *this < that || *this == that;
-    }
-
-    bool operator>=(const TunableValue& that) const {
-        return that <= *this;
     }
 
     template<typename T>
@@ -353,3 +368,12 @@ inline CastException::CastException(const TunableValue& value, Type type) :
         value.to_string() + " cannot be cast to " + type.name()) {}
 
 }  // namespace kernel_launcher
+
+namespace std {
+template<>
+struct hash<kernel_launcher::TunableValue> {
+    size_t operator()(const kernel_launcher::TunableValue& val) const noexcept {
+        return val.hash();
+    }
+};
+}  // namespace std
