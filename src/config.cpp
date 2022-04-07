@@ -43,9 +43,10 @@ Config Config::from_json(const nlohmann::json& json, const ConfigSpace& space) {
 TunableParam ConfigSpace::create_param(
     std::string name,
     Type type,
-    std::vector<TunableValue> values) {
-    TunableParam p = TunableParam(name, type);
-    params_.insert({p, std::move(values)});
+    std::vector<TunableValue> values,
+    TunableValue default_value) {
+    TunableParam p = TunableParam(name, type, values, default_value);
+    params_.push_back(p);
     return p;
 }
 
@@ -56,7 +57,7 @@ void ConfigSpace::restrict(Expr<bool> expr) {
 uint64_t ConfigSpace::size() const {
     uint64_t n = 1;
     for (const auto& p : params_) {
-        size_t k = p.second.size();
+        uint64_t k = (uint64_t) p.size();
         if (k == 0)
             return 0;
 
@@ -73,11 +74,11 @@ uint64_t ConfigSpace::size() const {
 
 bool ConfigSpace::get(uint64_t index, Config& config) const {
     for (const auto& p : params_) {
-        uint64_t n = (uint64_t)p.second.size();
+        uint64_t n = (uint64_t)p.size();
         uint64_t i = index % n;
         index /= n;
 
-        config.insert(p.first, p.second[i]);
+        config.insert(p, p[i]);
     }
 
     return is_valid(config);
@@ -95,7 +96,7 @@ bool ConfigSpace::is_valid(const Config& config) const {
     return true;
 }
 
-Config ConfigSpace::sample() const {
+Config ConfigSpace::sample_config() const {
     Config config;
     if (iterate().next(config)) {
         return config;
@@ -104,18 +105,33 @@ Config ConfigSpace::sample() const {
     }
 }
 
+Config ConfigSpace::default_config() const {
+    Config config;
+
+    for (const auto& param : params_) {
+        config.insert(param, param.default_value());
+    }
+
+    Eval eval = {config.get()};
+    for (const auto& r : restrictions_) {
+        if (!eval(r)) {
+            throw std::runtime_error(
+                "config does not pass restriction: " + r.to_string());
+        }
+    }
+
+    return config;
+}
+
 Config ConfigSpace::load_config(const nlohmann::json& obj) const {
     Config config;
 
-    for (const auto& p : params_) {
-        const TunableParam& param = p.first;
-        const std::vector<TunableValue>& valid_values = p.second;
-
+    for (const auto& param : params_) {
         TunableValue value = TunableValue::from_json(obj[param.name()]);
-        bool is_valid = false;
+        bool is_valid = param.default_value() == value;
 
-        for (const auto& valid_value : valid_values) {
-            is_valid |= valid_value == value;
+        for (const auto& allowed_value : param.values()) {
+            is_valid |= value == allowed_value;
         }
 
         if (!is_valid) {
@@ -137,9 +153,9 @@ Config ConfigSpace::load_config(const nlohmann::json& obj) const {
 }
 
 const TunableParam& ConfigSpace::at(std::string& s) const {
-    for (const auto& p : params_) {
-        if (p.first.name() == s) {
-            return p.first;
+    for (const auto& param : params_) {
+        if (param.name() == s) {
+            return param;
         }
     }
 
@@ -155,13 +171,13 @@ nlohmann::json ConfigSpace::to_json() const {
     json results = json::object();
 
     std::unordered_map<std::string, json> params;
-    for (const auto& p : params_) {
+    for (const auto& param : params_) {
         std::vector<json> values;
-        for (const auto& v : p.second) {
-            values.push_back(v.to_json());
+        for (const auto& value : param.values()) {
+            values.push_back(value.to_json());
         }
 
-        params[p.first.name()] = values;
+        params[param.name()] = values;
     }
     results["parameters"] = params;
 

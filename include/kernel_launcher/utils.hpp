@@ -121,53 +121,6 @@ TemplateArg template_type() {
     return TemplateArg(typeid(T));
 }
 
-struct TunableParam {
-  private:
-    struct Impl {
-        friend TunableParam;
-
-        Impl(std::string name, Type type) :
-            name_(std::move(name)),
-            type_(std::move(type)) {
-            static std::atomic<uint64_t> COUNTER = {1};
-            key_ = COUNTER++;
-        }
-
-      private:
-        uint64_t key_;
-        std::string name_;
-        Type type_;
-    };
-
-  public:
-    TunableParam(std::string name, Type type) {
-        inner_ = std::make_shared<Impl>(std::move(name), std::move(type));
-    }
-
-    const std::string& name() const {
-        return inner_->name_;
-    }
-
-    uint64_t key() const {
-        return inner_->key_;
-    }
-
-    Type type() const {
-        return inner_->type_;
-    }
-
-    bool operator==(const TunableParam& that) const {
-        return inner_.get() == that.inner_.get();
-    }
-
-    bool operator!=(const TunableParam& that) const {
-        return !(*this == that);
-    }
-
-  private:
-    std::shared_ptr<Impl> inner_;
-};
-
 template<
     typename L,
     typename R,
@@ -235,12 +188,3 @@ std::vector<T> range(T end) {
 }
 
 }  // namespace kernel_launcher
-
-namespace std {
-template<>
-struct hash<kernel_launcher::TunableParam> {
-    std::size_t operator()(const kernel_launcher::TunableParam& k) const {
-        return k.key();
-    }
-};
-}  // namespace std

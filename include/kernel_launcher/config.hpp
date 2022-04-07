@@ -36,31 +36,55 @@ struct ConfigSpace {
     ConfigSpace() = default;
     explicit ConfigSpace(const ConfigSpace&) = default;
 
-    template<typename T>
-    ParamExpr<T> tune(std::string name, const std::vector<T>& values) {
+    template<typename T, typename It>
+    ParamExpr<T> tune(std::string name, It begin, It end, T default_value) {
         std::vector<TunableValue> tvalues;
-        for (const auto& p : values) {
-            tvalues.push_back(p);
+        for (auto current = begin; current != end; ++current) {
+            tvalues.push_back(*current);
         }
 
-        return ParamExpr<T>(
-            create_param(std::move(name), type_of<T>(), std::move(tvalues)));
+        return ParamExpr<T>(create_param(
+            std::move(name),
+            type_of<T>(),
+            std::move(tvalues),
+            default_value));
+    }
+
+    template<typename T>
+    ParamExpr<T>
+    tune(std::string name, const std::vector<T>& values, T default_value) {
+        return tune(
+            std::move(name),
+            values.begin(),
+            values.end(),
+            std::move(default_value));
+    }
+
+    template<typename T>
+    ParamExpr<T> tune(std::string name, const std::vector<T>& values) {
+        return tune(std::move(name), values, values.at(0));
+    }
+
+    template<typename T>
+    ParamExpr<T> tune(
+        std::string name,
+        const std::initializer_list<T>& values,
+        T default_value) {
+        return tune(
+            std::move(name),
+            values.begin(),
+            values.end(),
+            std::move(default_value));
     }
 
     template<typename T>
     ParamExpr<T>
     tune(std::string name, const std::initializer_list<T>& values) {
-        std::vector<TunableValue> tvalues;
-        for (const auto& p : values) {
-            tvalues.push_back(p);
-        }
-
-        return ParamExpr<T>(
-            create_param(std::move(name), type_of<T>(), std::move(tvalues)));
+        KERNEL_LAUNCHER_ASSERT(values.size() > 0);
+        return tune(std::move(name), values, *values.begin());
     }
 
-    const std::unordered_map<TunableParam, std::vector<TunableValue>>&
-    parameters() const {
+    const std::vector<TunableParam>& parameters() const {
         return params_;
     }
 
@@ -68,21 +92,25 @@ struct ConfigSpace {
         return at(s);
     }
 
-    TunableParam
-    create_param(std::string name, Type type, std::vector<TunableValue> values);
+    TunableParam create_param(
+        std::string name,
+        Type type,
+        std::vector<TunableValue> values,
+        TunableValue default_value);
     const TunableParam& at(std::string& s) const;
     void restrict(Expr<bool> expr);
     uint64_t size() const;
     bool get(uint64_t index, Config& config) const;
     bool is_valid(const Config& config) const;
-    Config sample() const;
+    Config sample_config() const;
+    Config default_config() const;
     ConfigIterator iterate() const;
 
     Config load_config(const nlohmann::json& obj) const;
     nlohmann::json to_json() const;
 
   private:
-    std::unordered_map<TunableParam, std::vector<TunableValue>> params_;
+    std::vector<TunableParam> params_;
     std::vector<Expr<bool>> restrictions_;
 };
 
@@ -107,20 +135,22 @@ struct ConfigIterator {
 }  // namespace kernel_launcher
 
 namespace std {
-    template<>
-    struct hash<kernel_launcher::Config> {
-        size_t operator()(const kernel_launcher::Config& config) const noexcept {
-            size_t hash = 0;
+template<>
+struct hash<kernel_launcher::Config> {
+    size_t operator()(const kernel_launcher::Config& config) const noexcept {
+        size_t hash = 0;
 
-            for (const auto& p : config.get()) {
-                size_t left = std::hash<std::string> {}(p.first.name());
-                size_t right = std::hash<kernel_launcher::TunableValue> {}(p.second);
+        for (const auto& p : config.get()) {
+            size_t left = std::hash<std::string> {}(p.first.name());
+            size_t right =
+                std::hash<kernel_launcher::TunableValue> {}(p.second);
 
-                // Combine using XOR to ensure that the order of elements is not important while hashing.
-                hash ^= right + 0x9e3779b9 + (left<<6) + (left>>2); // From BOOST
-            }
-
-            return hash;
+            // Combine using XOR to ensure that the order of elements is not important while hashing.
+            hash ^=
+                right + 0x9e3779b9 + (left << 6) + (left >> 2);  // From BOOST
         }
-    };
+
+        return hash;
+    }
+};
 }  // namespace std

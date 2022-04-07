@@ -152,13 +152,13 @@ struct TunableValue {
     size_t hash() const {
         switch (type_) {
             case type_int:
-                return std::hash<intmax_t>{}(int_val_);
+                return std::hash<intmax_t> {}(int_val_);
             case type_double:
-                return std::hash<double>{}(double_val_);
+                return std::hash<double> {}(double_val_);
             case type_string:
-                return std::hash<std::string>{}(string_val_);
+                return std::hash<std::string> {}(string_val_);
             case type_bool:
-                return std::hash<bool>{}(bool_val_);
+                return std::hash<bool> {}(bool_val_);
             default:
                 return 0;
         }
@@ -367,9 +367,100 @@ inline CastException::CastException(const TunableValue& value, Type type) :
     std::runtime_error(
         value.to_string() + " cannot be cast to " + type.name()) {}
 
+struct TunableParam {
+  private:
+    struct Impl {
+        friend TunableParam;
+
+        Impl(
+            std::string name,
+            Type type,
+            std::vector<TunableValue> values,
+            TunableValue default_value) :
+            name_(std::move(name)),
+            type_(std::move(type)),
+            values_(std::move(values)),
+            default_value_(std::move(default_value)) {
+            static std::atomic<uint64_t> COUNTER = {1};
+            key_ = COUNTER++;
+        }
+
+      private:
+        uint64_t key_;
+        std::string name_;
+        Type type_;
+        std::vector<TunableValue> values_;
+        TunableValue default_value_;
+    };
+
+  public:
+    TunableParam(
+        std::string name,
+        Type type,
+        std::vector<TunableValue> values,
+        TunableValue default_value) {
+        inner_ = std::make_shared<Impl>(
+            std::move(name),
+            std::move(type),
+            std::move(values),
+            std::move(default_value));
+    }
+
+    const std::string& name() const {
+        return inner_->name_;
+    }
+
+    uint64_t key() const {
+        return inner_->key_;
+    }
+
+    Type type() const {
+        return inner_->type_;
+    }
+
+    const TunableValue& default_value() const {
+        return inner_->default_value_;
+    }
+
+    const std::vector<TunableValue>& values() const {
+        return inner_->values_;
+    }
+
+    const TunableValue& get(size_t i) const {
+        return values().at(i);
+    }
+
+    const TunableValue& operator[](size_t i) const {
+        return values().at(i);
+    }
+
+    size_t size() const {
+        return values().size();
+    }
+
+    bool operator==(const TunableParam& that) const {
+        return inner_.get() == that.inner_.get();
+    }
+
+    bool operator!=(const TunableParam& that) const {
+        return !(*this == that);
+    }
+
+  private:
+    std::shared_ptr<Impl> inner_;
+};
+
 }  // namespace kernel_launcher
 
 namespace std {
+
+template<>
+struct hash<kernel_launcher::TunableParam> {
+    std::size_t operator()(const kernel_launcher::TunableParam& k) const {
+        return k.key();
+    }
+};
+
 template<>
 struct hash<kernel_launcher::TunableValue> {
     size_t operator()(const kernel_launcher::TunableValue& val) const noexcept {

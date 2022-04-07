@@ -41,8 +41,8 @@ static json create_header(
     for (const auto& param : params) {
         std::vector<json> values;
 
-        for (const auto& val : builder.parameters().at(param)) {
-            values.push_back(val.to_json());
+        for (const auto& value : param.values()) {
+            values.push_back(value.to_json());
         }
 
         parameters.push_back(
@@ -50,10 +50,6 @@ static json create_header(
              {"type", param.type().name()},
              {"values", values}});
     }
-
-    std::sort(parameters.begin(), parameters.end(), [&](auto a, auto b) {
-        return a < b;
-    });
 
     char hostname[1024] = {0};
     gethostname(hostname, sizeof hostname);
@@ -137,9 +133,7 @@ bool TuningCache::initialize(
     parameters_.clear();
     cache_.clear();
 
-    for (const auto& p : builder.parameters()) {
-        parameters_.push_back(p.first);
-    }
+    parameters_ = builder.parameters();
 
     std::sort(parameters_.begin(), parameters_.end(), [](auto a, auto b) {
         return a.name() < b.name();
