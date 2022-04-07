@@ -33,6 +33,9 @@ struct Config {
 };
 
 struct ConfigSpace {
+    ConfigSpace() = default;
+    explicit ConfigSpace(const ConfigSpace&) = default;
+
     template<typename T>
     ParamExpr<T> tune(std::string name, const std::vector<T>& values) {
         std::vector<TunableValue> tvalues;
@@ -84,6 +87,7 @@ struct ConfigSpace {
 };
 
 struct ConfigIterator {
+    explicit ConfigIterator(const ConfigIterator&) = default;
     ConfigIterator() = default;
     ConfigIterator(ConfigSpace space) : space_(std::move(space)) {
         reset();

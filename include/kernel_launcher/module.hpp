@@ -40,6 +40,8 @@ assert_(CUresult err, const char* expression, const char* filename, int line) {
 
 static inline void
 assert_(bool cond, const char* expression, const char* filename, int line) {
+    (void)filename;
+    (void)line;
     if (!cond) {
         throw std::runtime_error(
             std::string("assertion failed: ") + expression);
