@@ -69,8 +69,8 @@ struct ConfigSpace {
     create_param(std::string name, Type type, std::vector<TunableValue> values);
     const TunableParam& at(std::string& s) const;
     void restrict(Expr<bool> expr);
-    size_t size() const;
-    bool get(size_t index, Config& config) const;
+    uint64_t size() const;
+    bool get(uint64_t index, Config& config) const;
     bool is_valid(const Config& config) const;
     Config sample() const;
     ConfigIterator iterate() const;
@@ -94,7 +94,10 @@ struct ConfigIterator {
 
   private:
     ConfigSpace space_;
-    std::vector<size_t> attempts_;
+    uint64_t index_;
+    uint64_t size_;
+    uint64_t log4_;
+    std::array<uint32_t, 4> murmur_rounds_;
 };
 
 }  // namespace kernel_launcher

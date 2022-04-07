@@ -53,8 +53,8 @@ void ConfigSpace::restrict(Expr<bool> expr) {
     restrictions_.push_back(std::move(expr));
 }
 
-size_t ConfigSpace::size() const {
-    size_t n = 1;
+uint64_t ConfigSpace::size() const {
+    uint64_t n = 1;
     for (const auto& p : params_) {
         size_t k = p.second.size();
         if (k == 0)
@@ -71,10 +71,10 @@ size_t ConfigSpace::size() const {
     return n;
 }
 
-bool ConfigSpace::get(size_t index, Config& config) const {
+bool ConfigSpace::get(uint64_t index, Config& config) const {
     for (const auto& p : params_) {
-        size_t n = p.second.size();
-        size_t i = index % n;
+        uint64_t n = (uint64_t)p.second.size();
+        uint64_t i = index % n;
         index /= n;
 
         config.insert(p.first, p.second[i]);
@@ -186,19 +186,64 @@ nlohmann::json ConfigSpace::to_json() const {
 }
 
 void ConfigIterator::reset() {
-    attempts_ = range(space_.size());
+    index_ = 0;
+    size_ = space_.size();
+
+    log4_ = 1;
+    while (size_ >= (1 << (2 * log4_))) {
+        log4_ += 1;
+    }
 
     std::random_device device;
-    std::default_random_engine rng {device()};
-    std::shuffle(attempts_.begin(), attempts_.end(), rng);
+    for (uint32_t& seed : murmur_rounds_) {
+        seed = device();
+    }
+}
+
+static uint32_t murmur_hash2(uint32_t key, uint32_t seed) {
+    const uint32_t m = 0x5bd1e995;
+    uint32_t h = seed;
+    uint32_t k = key;
+    k *= m;
+    k ^= k >> 24;
+    k *= m;
+    h *= m;
+    h ^= k;
+    h ^= h >> 13;
+    h *= m;
+    h ^= h >> 15;
+    return h;
+}
+
+template<size_t Rounds>
+static uint64_t encrypt_index(
+    uint64_t index,
+    uint64_t half_bits,
+    std::array<uint32_t, Rounds> seeds) {
+    uint64_t mask = (1 << half_bits) - 1;
+
+    // break our index into the left and right half
+    uint32_t left = (uint32_t)((index >> half_bits) & mask);
+    uint32_t right = (uint32_t)((index & mask));
+
+    // do 4 feistel rounds
+    for (uint32_t seed : seeds) {
+        uint32_t new_left = right;
+        uint32_t new_right = (left ^ murmur_hash2(right, seed)) & mask;
+        left = new_left;
+        right = new_right;
+    }
+
+    // put the left and right back together to form the encrypted index
+    return uint64_t(left << half_bits) | uint64_t(right);
 }
 
 bool ConfigIterator::next(Config& config) {
-    while (!attempts_.empty()) {
-        size_t index = attempts_.back();
-        attempts_.pop_back();
+    while (index_ < (1 << (2 * log4_))) {
+        uint64_t result = encrypt_index(index_, log4_, murmur_rounds_);
+        index_++;
 
-        if (space_.get(index, config)) {
+        if (result < size_ && space_.get(result, config)) {
             return true;
         }
     }
