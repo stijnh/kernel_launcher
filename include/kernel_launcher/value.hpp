@@ -426,12 +426,12 @@ struct TunableParam {
         return inner_->values_;
     }
 
-    const TunableValue& get(size_t i) const {
+    const TunableValue& at(size_t i) const {
         return values().at(i);
     }
 
     const TunableValue& operator[](size_t i) const {
-        return values().at(i);
+        return at(i);
     }
 
     size_t size() const {
