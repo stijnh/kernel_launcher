@@ -144,13 +144,7 @@ struct hash<kernel_launcher::Config> {
         size_t hash = 0;
 
         for (const auto& p : config.get()) {
-            size_t left = std::hash<std::string> {}(p.first.name());
-            size_t right =
-                std::hash<kernel_launcher::TunableValue> {}(p.second);
-
-            // Combine using XOR to ensure that the order of elements is not important while hashing.
-            hash ^=
-                right + 0x9e3779b9 + (left << 6) + (left >> 2);  // From BOOST
+            hash ^= p.first.hash() ^ p.second.hash();
         }
 
         return hash;
