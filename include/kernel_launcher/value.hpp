@@ -380,13 +380,9 @@ struct TunableParam {
             name_(std::move(name)),
             type_(std::move(type)),
             values_(std::move(values)),
-            default_value_(std::move(default_value)) {
-            static std::atomic<uint64_t> COUNTER = {1};
-            key_ = COUNTER++;
-        }
+            default_value_(std::move(default_value)) {}
 
       private:
-        uint64_t key_;
         std::string name_;
         Type type_;
         std::vector<TunableValue> values_;
@@ -410,8 +406,8 @@ struct TunableParam {
         return inner_->name_;
     }
 
-    uint64_t key() const {
-        return inner_->key_;
+    size_t hash() const {
+        return (size_t)inner_.get();
     }
 
     Type type() const {
@@ -457,7 +453,7 @@ namespace std {
 template<>
 struct hash<kernel_launcher::TunableParam> {
     std::size_t operator()(const kernel_launcher::TunableParam& k) const {
-        return k.key();
+        return k.hash();
     }
 };
 
