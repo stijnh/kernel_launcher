@@ -6,15 +6,6 @@ namespace kernel_launcher {
 
 using nlohmann::json;
 
-bool RandomStrategy::init(const KernelBuilder& builder, Config& config) {
-    iter_ = builder.iterate();
-    return iter_.next(config);
-}
-
-bool RandomStrategy::submit(double, Config& config) {
-    return iter_.next(config);
-}
-
 static std::string current_date() {
     using std::chrono::system_clock;
     std::time_t t = system_clock::to_time_t(system_clock::now());

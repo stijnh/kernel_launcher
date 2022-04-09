@@ -96,7 +96,7 @@ bool ConfigSpace::is_valid(const Config& config) const {
     return true;
 }
 
-Config ConfigSpace::sample_config() const {
+Config ConfigSpace::random_config() const {
     Config config;
     if (iterate().next(config)) {
         return config;

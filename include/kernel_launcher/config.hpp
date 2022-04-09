@@ -14,7 +14,7 @@ struct Config {
     explicit Config(const Config&) = default;
     Config(Config&&) = default;
     Config& operator=(Config&&) = default;
-    Config& operator=(const Config&) = delete;
+    Config& operator=(const Config&) = default;
 
     const TunableValue& operator[](const TunableParam& param) const {
         return at(param);
@@ -105,7 +105,7 @@ struct ConfigSpace {
     uint64_t size() const;
     bool get(uint64_t index, Config& config) const;
     bool is_valid(const Config& config) const;
-    Config sample_config() const;
+    Config random_config() const;
     Config default_config() const;
     ConfigIterator iterate() const;
 
