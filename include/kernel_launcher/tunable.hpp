@@ -2,11 +2,10 @@
 
 #include <ios>
 
-#include "kernel_launcher/strategy.hpp"
 #include "kernel_launcher/kernel.hpp"
+#include "kernel_launcher/strategy.hpp"
 
 namespace kernel_launcher {
-
 
 struct RawTuneKernel {
     RawTuneKernel() : state_(state_uninitialized) {
