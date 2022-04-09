@@ -14,12 +14,12 @@ bool RandomStrategy::submit(double, Config& config) {
 
 bool LimitStrategy::init(const KernelBuilder& builder, Config& config) {
     curr_eval_ = 0;
-    return inner_->init(builder, config);
+    return inner_.init(builder, config);
 }
 
 bool LimitStrategy::submit(double performance, Config& config) {
     curr_eval_++;
-    bool response = inner_->submit(performance, config);
+    bool response = inner_.submit(performance, config);
     return response && (curr_eval_ <= max_eval_);
 }
 

@@ -17,8 +17,8 @@ struct TuningCache {
     bool find(const Config& config, double& performance) const;
 
   private:
-    bool initialized_ = false;
     std::string filename_;
+    bool initialized_ = false;
     std::unordered_map<std::string, double> cache_ {};
     std::vector<TunableParam> parameters_ {};
 };
@@ -27,6 +27,41 @@ struct TuningStrategy {
     virtual bool init(const KernelBuilder& builder, Config& config) = 0;
     virtual bool submit(double performance, Config& config) = 0;
     virtual ~TuningStrategy() = default;
+};
+
+struct AnyTuningStrategy: TuningStrategy {
+    AnyTuningStrategy() = default;
+    AnyTuningStrategy(AnyTuningStrategy&&) = default;
+    AnyTuningStrategy& operator=(AnyTuningStrategy&&) = default;
+
+    template<typename T>
+    AnyTuningStrategy(std::unique_ptr<T>&& inner) : inner_(std::move(inner)) {}
+
+    template<typename T>
+    AnyTuningStrategy(T inner) :
+        inner_(
+            std::make_unique<typename std::decay<T>::type>(std::move(inner))) {}
+
+    operator bool() const {
+        return (bool)inner_;
+    }
+
+    void reset() {
+        inner_.reset();
+    }
+
+    bool init(const KernelBuilder& builder, Config& config) override {
+        KERNEL_LAUNCHER_ASSERT(*this);
+        return inner_->init(builder, config);
+    }
+
+    bool submit(double performance, Config& config) override {
+        KERNEL_LAUNCHER_ASSERT(*this);
+        return inner_->submit(performance, config);
+    }
+
+  private:
+    std::unique_ptr<TuningStrategy> inner_;
 };
 
 struct RandomStrategy: TuningStrategy {
@@ -38,8 +73,7 @@ struct RandomStrategy: TuningStrategy {
 };
 
 struct HillClimbingStrategy: TuningStrategy {
-    HillClimbingStrategy(std::unique_ptr<TuningStrategy> inner) :
-        inner_(std::move(inner)) {}
+    HillClimbingStrategy(AnyTuningStrategy inner) : inner_(std::move(inner)) {}
 
     bool init(const KernelBuilder& builder, Config& config) override;
     bool submit(double performance, Config& config) override;
@@ -52,13 +86,13 @@ struct HillClimbingStrategy: TuningStrategy {
     std::vector<std::pair<TunableParam, TunableValue>> neighbors_;
     size_t attempted_neighbors_count_;
     ConfigSpace space_;
-    std::unique_ptr<TuningStrategy> inner_;
+    AnyTuningStrategy inner_;
     double best_performance_;
     Config best_config_;
 };
 
 struct LimitStrategy: TuningStrategy {
-    LimitStrategy(uint64_t max_eval, std::unique_ptr<TuningStrategy> inner) :
+    LimitStrategy(uint64_t max_eval, AnyTuningStrategy inner) :
         max_eval_(max_eval),
         inner_(std::move(inner)) {}
 
@@ -68,14 +102,13 @@ struct LimitStrategy: TuningStrategy {
   private:
     uint64_t curr_eval_;
     uint64_t max_eval_;
-    std::unique_ptr<TuningStrategy> inner_;
+    AnyTuningStrategy inner_;
 };
 
 struct CachingStrategy: TuningStrategy {
-    template<typename T>
-    CachingStrategy(std::string filename, T inner = {}) :
-        inner_(std::make_unique<std::decay_t<T>>(std::forward<T>(inner))),
-        cache_(std::move(filename)) {
+    CachingStrategy(std::string filename, AnyTuningStrategy inner) :
+        cache_(std::move(filename)),
+        inner_(std::move(inner)) {
         //
     }
 
@@ -83,8 +116,8 @@ struct CachingStrategy: TuningStrategy {
     bool submit(double performance, Config& config) override;
 
   private:
-    std::unique_ptr<TuningStrategy> inner_;
     TuningCache cache_;
+    AnyTuningStrategy inner_;
     bool first_run_;
     Config first_config_;
 };

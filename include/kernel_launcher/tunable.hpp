@@ -8,26 +8,24 @@
 namespace kernel_launcher {
 
 struct RawTuneKernel {
-    RawTuneKernel() : state_(state_uninitialized) {
-        //
-    }
+    RawTuneKernel() = default;
 
     RawTuneKernel(
         KernelBuilder builder,
         std::vector<Type> parameter_types,
-        std::unique_ptr<Compiler> compiler = {},
-        std::unique_ptr<TuningStrategy> strategy = {}) :
-        state_(state_init),
+        AnyTuningStrategy strategy = {},
+        std::unique_ptr<Compiler> compiler =
+            std::make_unique<NvrtcCompiler>()) :
         builder_(std::make_unique<KernelBuilder>(std::move(builder))),
         strategy_(std::move(strategy)),
         compiler_(std::move(compiler)),
         parameter_types_(std::move(parameter_types)) {
         if (!strategy_) {
-            strategy_ = std::make_unique<RandomStrategy>();
+            strategy_ = RandomStrategy();
         }
 
-        if (!compiler_) {
-            compiler_ = std::make_unique<NvrtcCompiler>();
+        if (!strategy_.init(*builder_, current_config_)) {
+            throw std::runtime_error("search strategy failed to initialize");
         }
 
         next_configuration();
@@ -40,14 +38,14 @@ struct RawTuneKernel {
 
     enum {
         state_uninitialized,
-        state_init,
         state_tuning,
         state_compiling,
+        state_measuring,
         state_finished,
-    } state_;
+    } state_ = state_uninitialized;
 
     std::unique_ptr<KernelBuilder> builder_;
-    std::unique_ptr<TuningStrategy> strategy_;
+    AnyTuningStrategy strategy_;
     std::unique_ptr<Compiler> compiler_;
     std::vector<Type> parameter_types_;
 
@@ -72,17 +70,17 @@ struct TuneKernel {
 
     TuneKernel(
         KernelBuilder builder,
-        std::unique_ptr<TuningStrategy> strategy = {},
+        AnyTuningStrategy strategy = {},
         std::unique_ptr<Compiler> compiler = {}) :
         kernel_(
             std::move(builder),
             {type_of<Args>()...},
-            std::move(compiler),
-            std::move(strategy)) {}
+            std::move(strategy),
+            std::move(compiler)) {}
 
     static TuneKernel load(
         KernelBuilder builder,
-        std::unique_ptr<TuningStrategy> strategy = {},
+        AnyTuningStrategy strategy = {},
         std::unique_ptr<Compiler> compiler = {}) {
         return TuneKernel(
             std::move(builder),
@@ -92,7 +90,7 @@ struct TuneKernel {
 
     void initialize(
         KernelBuilder builder,
-        std::unique_ptr<TuningStrategy> strategy = {},
+        AnyTuningStrategy strategy = {},
         std::unique_ptr<Compiler> compiler = {}) {
         *this = TuneKernel(
             std::move(builder),
