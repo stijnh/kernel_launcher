@@ -9,6 +9,8 @@
 
 namespace kernel_launcher {
 
+const std::string& intern_string(const std::string& input);
+
 struct TunableValue;
 
 struct CastException: std::runtime_error {
@@ -29,9 +31,9 @@ struct TunableValue {
 
     TunableValue() {}
 
-    TunableValue(std::string value) :
+    TunableValue(const std::string& value) :
         type_(type_string),
-        string_val_(std::move(value)) {}
+        string_val_(&intern_string(value)) {}
 
     TunableValue(const char* value) : TunableValue(std::string(value)) {}
 
@@ -81,14 +83,11 @@ struct TunableValue {
         type_ = type_empty;
 
         switch (oldtype) {
-            case type_string:
-                using std::string;
-                string_val_.~string();
-                break;
             case type_list:
                 using std::vector;
                 list_val_.~vector();
                 break;
+            case type_string:
             case type_bool:
             case type_int:
             case type_double:
@@ -101,9 +100,7 @@ struct TunableValue {
         auto old_type = type_;
         auto new_type = val.type_;
 
-        if (old_type == type_string && new_type == type_string && 0) {
-            string_val_ = val.string_val_;
-        } else if (old_type == type_list && new_type == type_list && 0) {
+        if (old_type == type_list && new_type == type_list && 0) {
             list_val_ = val.list_val_;
         } else {
             clear();  // Sets type_ to empty
@@ -119,7 +116,7 @@ struct TunableValue {
                     bool_val_ = val.bool_val_;
                     break;
                 case type_string:
-                    new (&string_val_) std::string(val.string_val_);
+                    string_val_ = val.string_val_;
                     break;
                 case type_list:
                     new (&list_val_) std::vector<TunableValue>(val.list_val_);
@@ -151,7 +148,7 @@ struct TunableValue {
                 bool_val_ = that.bool_val_;
                 break;
             case type_string:
-                new (&string_val_) std::string(std::move(that.string_val_));
+                string_val_ = that.string_val_;
                 break;
             case type_list:
                 new (&list_val_)
@@ -179,7 +176,7 @@ struct TunableValue {
             case type_double:
                 return this->double_val_ == that.double_val_;
             case type_string:
-                return this->string_val_ == that.string_val_;
+                return *this->string_val_ == *that.string_val_;
             case type_bool:
                 return this->bool_val_ == that.bool_val_;
             case type_list:
@@ -206,7 +203,7 @@ struct TunableValue {
             case type_double:
                 return this->double_val_ < that.double_val_;
             case type_string:
-                return this->string_val_ < that.string_val_;
+                return *this->string_val_ < *that.string_val_;
             case type_bool:
                 return this->bool_val_ < that.bool_val_;
             case type_list:
@@ -235,7 +232,7 @@ struct TunableValue {
             case type_double:
                 return std::hash<double> {}(double_val_);
             case type_string:
-                return std::hash<std::string> {}(string_val_);
+                return std::hash<std::string> {}(*string_val_);
             case type_bool:
                 return std::hash<bool> {}(bool_val_);
             case type_list: {
@@ -266,7 +263,7 @@ struct TunableValue {
             case type_double:
                 return std::to_string(double_val_);
             case type_string:
-                return string_val_;
+                return *string_val_;
             case type_bool:
                 return bool_val_ ? "true" : "false";
             case type_list: {
@@ -447,7 +444,7 @@ struct TunableValue {
             case type_double:
                 return double_val_;
             case type_string:
-                return string_val_;
+                return *string_val_;
             case type_bool:
                 return bool_val_;
             case type_list: {
@@ -589,7 +586,7 @@ struct TunableValue {
         double double_val_;
         bool bool_val_;
         std::vector<TunableValue> list_val_;
-        std::string string_val_;
+        const std::string* string_val_;
     };
 };
 
