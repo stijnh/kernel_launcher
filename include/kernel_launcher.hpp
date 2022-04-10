@@ -4,4 +4,6 @@
 #include <kernel_launcher/kernel.hpp>
 #include <kernel_launcher/utils.hpp>
 #include <kernel_launcher/value.hpp>
-#include <kernel_launcher/tunable.hpp>
+#include <kernel_launcher/tune_kernel.hpp>
+#include <kernel_launcher/strategy.hpp>
+#include <kernel_launcher/module.hpp>

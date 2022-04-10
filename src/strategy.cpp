@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 namespace kernel_launcher {
+
 bool RandomStrategy::init(const KernelBuilder& builder, Config& config) {
     iter_ = builder.iterate();
     return iter_.next(config);
@@ -18,9 +19,8 @@ bool LimitStrategy::init(const KernelBuilder& builder, Config& config) {
 }
 
 bool LimitStrategy::submit(double performance, Config& config) {
-    curr_eval_++;
-    bool response = inner_.submit(performance, config);
-    return response && (curr_eval_ <= max_eval_);
+    bool x = inner_.submit(performance, config) && curr_eval_++ < max_eval_;
+    return x;
 }
 
 void HillClimbingStrategy::update_best(
@@ -45,7 +45,10 @@ bool HillClimbingStrategy::init(const KernelBuilder& builder, Config& config) {
         }
     }
 
-    config = space_.default_config();
+    if (!inner_.init(builder, config)) {
+        return false;
+    }
+
     update_best(0.0, config);
     return space_.size() > 0;
 }
@@ -58,7 +61,7 @@ bool HillClimbingStrategy::submit(double performance, Config& config) {
     }
 
     while (attempted_neighbors_count_ < neighbors_.size()) {
-        std::uniform_int_distribution<size_t> dist {0, neighbors_.size()};
+        std::uniform_int_distribution<size_t> dist {0, neighbors_.size() - 1};
         size_t index = dist(rng_);
 
         if (attempted_neighbors_[index]) {
@@ -86,8 +89,63 @@ bool HillClimbingStrategy::submit(double performance, Config& config) {
         return true;
     }
 
-    config = space_.random_config();
+    if (!inner_.submit(performance, config)) {
+        return false;
+    }
+
     update_best(0, config);
     return true;
 }
+
+static bool internal_submit(
+    const TuningCache& cache,
+    TuningStrategy& inner,
+    Config& config) {
+    double perf;
+
+    while (true) {
+        if (!cache.find(config, perf)) {
+            return true;
+        } else {
+        }
+
+        if (!inner.submit(perf, config)) {
+            return false;
+        } else {
+        }
+    }
+}
+
+bool CachingStrategy::init(const KernelBuilder& builder, Config& config) {
+    if (!inner_.init(builder, config)) {
+        return false;
+    }
+
+    Config best_config;
+    if (cache_.initialize(filename_, builder, best_config)) {
+        first_run_ = true;
+        first_config_ = std::move(config);
+        config = std::move(best_config);
+        return true;
+    }
+
+    first_run_ = false;
+    return internal_submit(cache_, inner_, config);
+}
+
+bool CachingStrategy::submit(double performance, Config& config) {
+    if (first_run_) {
+        first_run_ = false;
+        config = std::move(first_config_);
+    } else {
+        cache_.append(config, performance);
+
+        if (!inner_.submit(performance, config)) {
+            return false;
+        }
+    }
+
+    return internal_submit(cache_, inner_, config);
+}
+
 }  // namespace kernel_launcher

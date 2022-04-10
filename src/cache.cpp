@@ -1,10 +1,13 @@
-#include "kernel_launcher/tunable.hpp"
+#include "kernel_launcher/cache.hpp"
 
 #include <unistd.h>
 
 namespace kernel_launcher {
 
 using nlohmann::json;
+
+#define HEADER_MAGIC   ("kernel_launcher")
+#define HEADER_VERSION ("0.1")
 
 static std::string current_date() {
     using std::chrono::system_clock;
@@ -21,9 +24,6 @@ static std::string current_device_name() {
     KERNEL_LAUNCHER_ASSERT(cuDeviceGetName(name, sizeof name, device));
     return name;
 }
-
-#define HEADER_MAGIC   ("kernel_launcher")
-#define HEADER_VERSION ("0.1")
 
 static json create_header(
     const KernelBuilder& builder,
@@ -118,8 +118,10 @@ static void assert_header_correct(
 }
 
 bool TuningCache::initialize(
+    std::string filename,
     const KernelBuilder& builder,
     Config& best_config) {
+    filename_ = std::move(filename);
     initialized_ = true;
     parameters_.clear();
     cache_.clear();
@@ -217,135 +219,4 @@ bool TuningCache::find(const Config& config, double& answer) const {
     answer = it->second;
     return true;
 }
-
-static bool internal_submit(
-    const TuningCache& cache,
-    TuningStrategy& inner,
-    Config& config) {
-    double perf;
-
-    while (true) {
-        if (!cache.find(config, perf)) {
-            return true;
-        }
-
-        if (!inner.submit(perf, config)) {
-            return false;
-        }
-    }
-}
-
-bool CachingStrategy::init(const KernelBuilder& builder, Config& config) {
-    if (!inner_.init(builder, config)) {
-        return false;
-    }
-
-    Config best_config;
-    if (cache_.initialize(builder, best_config)) {
-        first_run_ = true;
-        first_config_ = std::move(config);
-        config = std::move(best_config);
-        return true;
-    } else {
-        first_run_ = false;
-    }
-
-    return internal_submit(cache_, inner_, config);
-}
-
-bool CachingStrategy::submit(double performance, Config& config) {
-    if (first_run_) {
-        first_run_ = false;
-        config = std::move(first_config_);
-    } else {
-        cache_.append(config, performance);
-
-        if (!inner_.submit(performance, config)) {
-            return false;
-        }
-    }
-
-    return internal_submit(cache_, inner_, config);
-}
-
-void RawTuneKernel::launch(
-    cudaStream_t stream,
-    dim3 problem_size,
-    void** args) {
-    while (1) {
-        // Finished tuning, just launch the best kernel
-        if (state_ == state_finished) {
-            best_kernel_.launch(stream, problem_size, args);
-            return;
-        }
-
-        // Measure performance of kernel
-        else if (state_ == state_measuring) {
-            after_event_.synchronize();
-            current_time_ += after_event_.seconds_elapsed_since(before_event_);
-            state_ = state_tuning;
-
-            if (current_time_ > 1.0) {
-                double performance = current_workload_ / current_time_;
-
-                if (performance > best_performance_) {
-                    best_kernel_ = std::exchange(current_kernel_, {});
-                    best_performance_ = performance;
-                }
-
-                if (!strategy_.submit(performance, current_config_)) {
-                    state_ = state_finished;
-                    builder_.reset();
-                    strategy_.reset();
-                    compiler_.reset();
-                    continue;
-                }
-
-                next_configuration();
-            }
-        }
-
-        // Launch tuning run
-        else if (state_ == state_tuning) {
-            before_event_.record(stream);
-            current_kernel_.launch(stream, problem_size, args);
-            after_event_.record(stream);
-
-            uint64_t workload =
-                problem_size.x * problem_size.y * problem_size.z;
-            current_workload_ += workload;
-            state_ = state_measuring;
-            return;
-        }
-
-        // Waiting for compilation of kernel
-        else if (state_ == state_compiling) {
-            after_event_.synchronize();
-
-            if (current_kernel_.ready()) {
-                state_ = state_tuning;
-            } else if (best_kernel_.ready()) {
-                best_kernel_.launch(stream, problem_size, args);
-                after_event_.record(stream);
-                return;
-            } else {
-                current_kernel_.wait_ready();
-            }
-        }
-
-        // Invalid state?
-        else {
-            throw std::runtime_error("kernel has not been initialized");
-        }
-    }
-}
-
-void RawTuneKernel::next_configuration() {
-    state_ = state_compiling;
-    current_kernel_ =
-        builder_->compile(current_config_, parameter_types_, *compiler_);
-    current_workload_ = 0;
-    current_time_ = 0;
-}
-
 }  // namespace kernel_launcher
