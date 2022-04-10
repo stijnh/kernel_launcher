@@ -9,7 +9,7 @@
 
 namespace kernel_launcher {
 
-const std::string& intern_string(const std::string& input);
+const std::string& intern_string(const char* input);
 
 struct TunableValue;
 
@@ -31,11 +31,11 @@ struct TunableValue {
 
     TunableValue() {}
 
-    TunableValue(const std::string& value) :
+    TunableValue(const char* value) :
         type_(type_string),
         string_val_(&intern_string(value)) {}
 
-    TunableValue(const char* value) : TunableValue(std::string(value)) {}
+    TunableValue(const std::string& value) : TunableValue(value.c_str()) {}
 
     TunableValue(Type t) : TunableValue(t.name()) {}
 
@@ -45,99 +45,41 @@ struct TunableValue {
 
     TunableValue(float i) : type_(type_double), double_val_(i) {}
 
-    template<typename T>
-    TunableValue(std::initializer_list<T> list) :
-        type_(type_list),
-        list_val_({}) {
-        for (const auto& p : list) {
-            list_val_.push_back(TunableValue(p));
-        }
-    }
-
-    template<typename T>
-    TunableValue(std::vector<T> list) : type_(type_list), list_val_({}) {
-        for (auto&& p : list) {
-            list_val_.push_back(TunableValue(std::move(p)));
-        }
-    }
-
-    template<typename T, size_t N>
-    TunableValue(std::array<T, N> list) : type_(type_list), list_val_({}) {
-        for (auto&& p : list) {
-            list_val_.push_back(TunableValue(std::move(p)));
-        }
-    }
-
-    template<typename A, typename B>
-    TunableValue(std::pair<A, B> list) : type_(type_list), list_val_({}) {
-        list_val_.push_back(std::move(list.first));
-        list_val_.push_back(std::move(list.second));
-    }
-
     ~TunableValue() {
         clear();
     }
 
     void clear() {
-        auto oldtype = type_;
         type_ = type_empty;
-
-        switch (oldtype) {
-            case type_list:
-                using std::vector;
-                list_val_.~vector();
-                break;
-            case type_string:
-            case type_bool:
-            case type_int:
-            case type_double:
-            case type_empty:
-                break;
-        }
     }
 
     TunableValue& operator=(const TunableValue& val) {
-        auto old_type = type_;
-        auto new_type = val.type_;
-
-        if (old_type == type_list && new_type == type_list && 0) {
-            list_val_ = val.list_val_;
-        } else {
-            clear();  // Sets type_ to empty
-
-            switch (new_type) {
-                case type_double:
-                    double_val_ = val.double_val_;
-                    break;
-                case type_int:
-                    int_val_ = val.int_val_;
-                    break;
-                case type_bool:
-                    bool_val_ = val.bool_val_;
-                    break;
-                case type_string:
-                    string_val_ = val.string_val_;
-                    break;
-                case type_list:
-                    new (&list_val_) std::vector<TunableValue>(val.list_val_);
-                    break;
-                case type_empty:
-                    break;
-            }
-
-            type_ =
-                new_type;  // Set type_ now since the copy constructors might throw
+        type_ = val.type_;
+        switch (type_) {
+            case type_double:
+                double_val_ = val.double_val_;
+                break;
+            case type_int:
+                int_val_ = val.int_val_;
+                break;
+            case type_bool:
+                bool_val_ = val.bool_val_;
+                break;
+            case type_string:
+                string_val_ = val.string_val_;
+                break;
+            case type_empty:
+                break;
         }
 
         return *this;
     }
 
     TunableValue& operator=(TunableValue&& that) noexcept {
-        clear();
-        auto new_type = that.type_;
+        type_ = that.type_;
         that.type_ = type_empty;
 
-        switch (new_type) {
+        switch (type_) {
             case type_double:
                 double_val_ = that.double_val_;
                 break;
@@ -150,16 +92,10 @@ struct TunableValue {
             case type_string:
                 string_val_ = that.string_val_;
                 break;
-            case type_list:
-                new (&list_val_)
-                    std::vector<TunableValue>(std::move(that.list_val_));
-                break;
             case type_empty:
                 break;
         }
 
-        type_ =
-            new_type;  // type_ now since the move constructors might throw (is it true?)
         return *this;
     }
 
@@ -176,11 +112,10 @@ struct TunableValue {
             case type_double:
                 return this->double_val_ == that.double_val_;
             case type_string:
-                return *this->string_val_ == *that.string_val_;
+                // ptr comparison is sufficient since strings are interned
+                return this->string_val_ == that.string_val_;
             case type_bool:
                 return this->bool_val_ == that.bool_val_;
-            case type_list:
-                return this->list_val_ == that.list_val_;
             default:
                 return false;
         }
@@ -206,8 +141,6 @@ struct TunableValue {
                 return *this->string_val_ < *that.string_val_;
             case type_bool:
                 return this->bool_val_ < that.bool_val_;
-            case type_list:
-                return this->list_val_ < that.list_val_;
             default:
                 return false;
         }
@@ -235,14 +168,6 @@ struct TunableValue {
                 return std::hash<std::string> {}(*string_val_);
             case type_bool:
                 return std::hash<bool> {}(bool_val_);
-            case type_list: {
-                size_t h = 0;
-                for (const auto& p : list_val_) {
-                    h ^= p.hash();  // TODO: find better hash combiner
-                }
-
-                return h;
-            }
             default:
                 return 0;
         }
@@ -266,24 +191,6 @@ struct TunableValue {
                 return *string_val_;
             case type_bool:
                 return bool_val_ ? "true" : "false";
-            case type_list: {
-                std::stringstream out;
-                out << "[";
-                bool is_first = true;
-
-                for (const auto& p : list_val_) {
-                    if (is_first) {
-                        is_first = false;
-                    } else {
-                        out << ", ";
-                    }
-
-                    out << p.to_string();
-                }
-
-                out << "]";
-                return out.str();
-            }
             default:
                 return "";
         }
@@ -318,113 +225,6 @@ struct TunableValue {
         return to_float();
     }
 
-    bool is_list() const {
-        return type_ == type_list;
-    }
-
-    template<typename T>
-    bool is_vector() const {
-        if (!is_list()) {
-            return false;
-        }
-
-        for (const auto& p : list_val_) {
-            if (!p.is<T>()) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    template<typename T>
-    std::vector<T> to_vector() const {
-        if (!is_vector<T>()) {
-            throw CastException(*this, type_of<std::vector<T>>());
-        }
-
-        std::vector<T> result;
-        for (const auto& p : list_val_) {
-            result.push_back(p.to(TypeIndicator<T> {}));
-        }
-        return result;
-    }
-
-    template<typename T>
-    bool is(TypeIndicator<std::vector<T>>) const {
-        return is_vector<T>();
-    }
-
-    template<typename T>
-    std::vector<T> to(TypeIndicator<std::vector<T>>) const {
-        return to_vector<T>();
-    }
-
-    template<typename A, typename B>
-    bool is_pair() const {
-        return is_list() && list_val_.size() == 2 && list_val_[0].is<A>()
-            && list_val_[1].is<B>();
-    }
-
-    template<typename A, typename B>
-    std::pair<A, B> to_pair() const {
-        if (!is_pair<A, B>()) {
-            throw CastException(*this, type_of<std::pair<A, B>>());
-        }
-
-        return {
-            list_val_[0].to(TypeIndicator<A>()),
-            list_val_[1].to(TypeIndicator<B>())};
-    }
-
-    template<typename A, typename B>
-    bool is(TypeIndicator<std::pair<A, B>>) const {
-        return is_pair<A, B>();
-    }
-
-    template<typename A, typename B>
-    std::pair<A, B> to(TypeIndicator<std::pair<A, B>>) const {
-        return to_pair<A, B>();
-    }
-
-    template<typename T, size_t N>
-    bool is_array() const {
-        if (!is_list() && list_val_.size() == N) {
-            return false;
-        }
-
-        for (const auto& p : list_val_) {
-            if (!p.is<T>()) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    template<typename T, size_t N>
-    std::array<T, N> to_array() const {
-        if (!is_array<T, N>()) {
-            throw CastException(*this, type_of<std::array<T, N>>());
-        }
-
-        std::array<T, N> result;
-        for (size_t i = 0; i < N; i++) {
-            result[i] = list_val_[i].to(TypeIndicator<T>());
-        }
-        return result;
-    }
-
-    template<typename T, size_t N>
-    bool is(TypeIndicator<std::array<T, N>>) const {
-        return is_array<T, N>();
-    }
-
-    template<typename T, size_t N>
-    std::array<T, N> to(TypeIndicator<std::array<T, N>>) const {
-        return to_array<T, N>();
-    }
-
     template<typename T>
     bool is() const {
         return is(TypeIndicator<T> {});
@@ -447,14 +247,6 @@ struct TunableValue {
                 return *string_val_;
             case type_bool:
                 return bool_val_;
-            case type_list: {
-                std::vector<json> result;
-                for (const auto& p : list_val_) {
-                    result.push_back(p.to_json());
-                }
-
-                return result;
-            }
             case type_empty:
                 break;  // fallthrough
         }
@@ -479,14 +271,6 @@ struct TunableValue {
                 return (json::number_unsigned_t)obj;
             case json::value_t::number_float:
                 return (json::number_float_t)obj;
-            case json::value_t::array: {
-                std::vector<TunableValue> result;
-                for (const auto& item : obj) {
-                    result.push_back(TunableValue::from_json(item));
-                }
-
-                return result;
-            }
             default:
                 break;  // fallthrough
         }
@@ -578,14 +362,12 @@ struct TunableValue {
         type_double,
         type_string,
         type_bool,
-        type_list,
     } type_ = type_empty;
 
     union {
         intmax_t int_val_;
         double double_val_;
         bool bool_val_;
-        std::vector<TunableValue> list_val_;
         const std::string* string_val_;
     };
 };
