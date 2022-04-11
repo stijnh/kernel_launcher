@@ -113,7 +113,7 @@ struct KernelBuilder: ConfigSpace {
     RawKernel compile(
         const Config& config,
         const std::vector<Type>& parameter_types,
-        const Compiler& compiler = DEFAULT_COMPILER) const;
+        const CompilerBase& compiler = DEFAULT_COMPILER) const;
 
     nlohmann::json to_json() const;
 
@@ -182,14 +182,14 @@ struct Kernel {
     Kernel(
         const KernelBuilder& builder,
         const Config& config,
-        const Compiler& compiler = DEFAULT_COMPILER) {
+        const CompilerBase& compiler = DEFAULT_COMPILER) {
         initialize(builder, config, compiler);
     }
 
     static Kernel<Args...> load(
         const KernelBuilder& builder,
         const Config& config,
-        const Compiler& compiler = DEFAULT_COMPILER) {
+        const CompilerBase& compiler = DEFAULT_COMPILER) {
         Kernel<Args...> kernel;
         kernel.load(builder, config, compiler);
         return kernel;
@@ -198,7 +198,7 @@ struct Kernel {
     void initialize(
         const KernelBuilder& builder,
         const Config& config,
-        const Compiler& compiler = DEFAULT_COMPILER) {
+        const CompilerBase& compiler = DEFAULT_COMPILER) {
         kernel_ = builder.compile(config, {type_of<Args>()...}, compiler);
     }
 

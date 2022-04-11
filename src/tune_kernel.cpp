@@ -101,7 +101,7 @@ void RawTuneKernel::launch(
 void RawTuneKernel::next_configuration() {
     state_ = state_compiling;
     current_kernel_ =
-        builder_->compile(current_config_, parameter_types_, *compiler_);
+        builder_->compile(current_config_, parameter_types_, compiler_);
     aggregator_.reset();
 }
 

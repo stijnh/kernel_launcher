@@ -31,7 +31,7 @@ struct RawTuneKernel {
         KernelBuilder builder,
         std::vector<Type> parameter_types,
         Strategy strategy = {},
-        std::unique_ptr<Compiler> compiler = std::make_unique<NvrtcCompiler>(),
+        Compiler compiler = DEFAULT_COMPILER,
         Aggregator aggregator = {}) :
         builder_(std::make_unique<KernelBuilder>(std::move(builder))),
         strategy_(std::move(strategy)),
@@ -64,7 +64,7 @@ struct RawTuneKernel {
 
     std::unique_ptr<KernelBuilder> builder_;
     Strategy strategy_;
-    std::unique_ptr<Compiler> compiler_;
+    Compiler compiler_;
     std::vector<Type> parameter_types_;
 
     CudaEvent before_event_;
@@ -89,7 +89,7 @@ struct TuneKernel {
     TuneKernel(
         KernelBuilder builder,
         Strategy strategy = {},
-        std::unique_ptr<Compiler> compiler = {}) :
+        Compiler compiler = DEFAULT_COMPILER) :
         kernel_(
             std::move(builder),
             {type_of<Args>()...},
@@ -99,7 +99,7 @@ struct TuneKernel {
     static TuneKernel load(
         KernelBuilder builder,
         Strategy strategy = {},
-        std::unique_ptr<Compiler> compiler = {}) {
+        Compiler compiler = DEFAULT_COMPILER) {
         return TuneKernel(
             std::move(builder),
             std::move(strategy),
@@ -109,7 +109,7 @@ struct TuneKernel {
     void initialize(
         KernelBuilder builder,
         Strategy strategy = {},
-        std::unique_ptr<Compiler> compiler = {}) {
+        Compiler compiler = DEFAULT_COMPILER) {
         *this = TuneKernel(
             std::move(builder),
             std::move(strategy),

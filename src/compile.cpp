@@ -167,12 +167,13 @@ std::future<CudaModule> AsyncCompiler::compile(
     CUdevice* device_opt) const {
     CUcontext context;
     KERNEL_LAUNCHER_ASSERT(cuCtxGetCurrent(&context));
+    auto inner = inner_;  // Copy inner
 
     auto out = std::async(std::launch::async, [=]() {
         KERNEL_LAUNCHER_ASSERT(cuCtxSetCurrent(context));
 
-        return inner_
-            ->compile(
+        return inner
+            .compile(
                 kernel_source,
                 kernel_name,
                 template_args,

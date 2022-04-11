@@ -73,7 +73,7 @@ struct NvrtcException: std::runtime_error {
     nvrtcResult err_;
 };
 
-struct Compiler {
+struct CompilerBase {
     virtual std::future<CudaModule> compile(
         const Source& kernel_source,
         const std::string& kernel_name,
@@ -81,10 +81,48 @@ struct Compiler {
         const std::vector<Type>& parameter_types,
         const std::vector<std::string>& options,
         CUdevice* device_opt) const = 0;
-    virtual ~Compiler() = default;
+    virtual ~CompilerBase() = default;
 };
 
-struct NvrtcCompiler: Compiler {
+struct Compiler: CompilerBase {
+    Compiler() = default;
+    Compiler(const Compiler&) = default;
+    Compiler(Compiler&&) = default;
+
+    template<typename C>
+    Compiler(std::shared_ptr<C> inner) : inner_(std::move(inner)) {}
+
+    template<typename C>
+    Compiler(C compiler) :
+        inner_(std::make_shared<typename std::decay<C>::type>(
+            std::move(compiler))) {}
+
+    void reset() {
+        inner_.reset();
+    }
+
+    std::future<CudaModule> compile(
+        const Source& kernel_source,
+        const std::string& kernel_name,
+        const std::vector<TemplateArg>& template_args,
+        const std::vector<Type>& parameter_types,
+        const std::vector<std::string>& options,
+        CUdevice* device_opt) const {
+        KERNEL_LAUNCHER_ASSERT((bool)inner_);
+        return inner_->compile(
+            kernel_source,
+            kernel_name,
+            template_args,
+            parameter_types,
+            options,
+            device_opt);
+    }
+
+  private:
+    std::shared_ptr<CompilerBase> inner_;
+};
+
+struct NvrtcCompiler: CompilerBase {
     NvrtcCompiler() {
         //
     }
@@ -105,9 +143,8 @@ struct NvrtcCompiler: Compiler {
     std::vector<std::string> global_options_;
 };
 
-struct AsyncCompiler: Compiler {
-    template<typename C>
-    AsyncCompiler(C compiler) : inner_(std::make_shared<C>(compiler)) {
+struct AsyncCompiler: CompilerBase {
+    AsyncCompiler(Compiler compiler) : inner_(std::move(compiler)) {
         //
     }
 
@@ -120,7 +157,7 @@ struct AsyncCompiler: Compiler {
         CUdevice* device_opt) const override;
 
   private:
-    std::shared_ptr<Compiler> inner_;
+    Compiler inner_;
 };
 
 }  // namespace kernel_launcher

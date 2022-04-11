@@ -110,7 +110,7 @@ KernelBuilder::tune_define(std::string name, std::vector<std::string> values) {
 RawKernel KernelBuilder::compile(
     const Config& config,
     const std::vector<Type>& parameter_types,
-    const Compiler& compiler) const {
+    const CompilerBase& compiler) const {
     Eval eval = {config.get()};
 
     for (const auto& p : assertions_) {
