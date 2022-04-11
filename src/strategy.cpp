@@ -97,10 +97,8 @@ bool HillClimbingStrategy::submit(double performance, Config& config) {
     return true;
 }
 
-static bool internal_submit(
-    const TuningCache& cache,
-    TuningStrategy& inner,
-    Config& config) {
+static bool
+internal_submit(const TuningCache& cache, BaseStrategy& inner, Config& config) {
     double perf;
 
     while (true) {

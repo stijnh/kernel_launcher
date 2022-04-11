@@ -7,23 +7,22 @@
 #include "kernel_launcher/kernel.hpp"
 
 namespace kernel_launcher {
-
-struct TuningStrategy {
+struct BaseStrategy {
     virtual bool init(const KernelBuilder& builder, Config& config) = 0;
     virtual bool submit(double performance, Config& config) = 0;
-    virtual ~TuningStrategy() = default;
+    virtual ~BaseStrategy() = default;
 };
 
-struct AnyTuningStrategy: TuningStrategy {
-    AnyTuningStrategy() = default;
-    AnyTuningStrategy(AnyTuningStrategy&&) = default;
-    AnyTuningStrategy& operator=(AnyTuningStrategy&&) = default;
+struct Strategy: BaseStrategy {
+    Strategy() = default;
+    Strategy(Strategy&&) = default;
+    Strategy& operator=(Strategy&&) = default;
 
     template<typename T>
-    AnyTuningStrategy(std::unique_ptr<T>&& inner) : inner_(std::move(inner)) {}
+    Strategy(std::unique_ptr<T>&& inner) : inner_(std::move(inner)) {}
 
     template<typename T>
-    AnyTuningStrategy(T inner) :
+    Strategy(T inner) :
         inner_(
             std::make_unique<typename std::decay<T>::type>(std::move(inner))) {}
 
@@ -48,10 +47,10 @@ struct AnyTuningStrategy: TuningStrategy {
     }
 
   private:
-    std::unique_ptr<TuningStrategy> inner_;
+    std::unique_ptr<BaseStrategy> inner_;
 };
 
-struct RandomStrategy: TuningStrategy {
+struct RandomStrategy: BaseStrategy {
     bool init(const KernelBuilder& builder, Config& config) override;
     bool submit(double performance, Config& config) override;
 
@@ -59,8 +58,8 @@ struct RandomStrategy: TuningStrategy {
     ConfigIterator iter_ {};
 };
 
-struct HillClimbingStrategy: TuningStrategy {
-    HillClimbingStrategy(AnyTuningStrategy inner = RandomStrategy {}) :
+struct HillClimbingStrategy: BaseStrategy {
+    HillClimbingStrategy(Strategy inner = RandomStrategy {}) :
         inner_(std::move(inner)) {}
 
     bool init(const KernelBuilder& builder, Config& config) override;
@@ -74,15 +73,13 @@ struct HillClimbingStrategy: TuningStrategy {
     std::vector<std::pair<TunableParam, TunableValue>> neighbors_ = {};
     size_t attempted_neighbors_count_ = 0;
     ConfigSpace space_ {};
-    AnyTuningStrategy inner_ {};
+    Strategy inner_ {};
     double best_performance_ = -1e99;
     Config best_config_ {};
 };
 
-struct LimitStrategy: TuningStrategy {
-    LimitStrategy(
-        uint64_t max_eval,
-        AnyTuningStrategy inner = RandomStrategy {}) :
+struct LimitStrategy: BaseStrategy {
+    LimitStrategy(uint64_t max_eval, Strategy inner = RandomStrategy {}) :
         max_eval_(max_eval),
         inner_(std::move(inner)) {}
 
@@ -92,13 +89,11 @@ struct LimitStrategy: TuningStrategy {
   private:
     uint64_t curr_eval_ = 0;
     uint64_t max_eval_ = 0;
-    AnyTuningStrategy inner_ {};
+    Strategy inner_ {};
 };
 
-struct CachingStrategy: TuningStrategy {
-    CachingStrategy(
-        std::string filename,
-        AnyTuningStrategy inner = RandomStrategy {}) :
+struct CachingStrategy: BaseStrategy {
+    CachingStrategy(std::string filename, Strategy inner = RandomStrategy {}) :
         filename_(std::move(filename)),
         inner_(std::move(inner)) {
         //
@@ -110,15 +105,34 @@ struct CachingStrategy: TuningStrategy {
   private:
     std::string filename_ {};
     TuningCache cache_ {};
-    AnyTuningStrategy inner_ {};
+    Strategy inner_ {};
     bool first_run_ = true;
     Config first_config_ {};
 };
 
+namespace strategy {
+    inline RandomStrategy random() {
+        return RandomStrategy();
+    }
+
+    inline LimitStrategy limit(size_t max_eval, Strategy strategy = random()) {
+        return LimitStrategy(max_eval, std::move(strategy));
+    }
+
+    inline HillClimbingStrategy hill_climbing(Strategy strategy = random()) {
+        return HillClimbingStrategy(std::move(strategy));
+    }
+
+    inline CachingStrategy
+    cache(std::string filename, Strategy strategy = random()) {
+        return CachingStrategy(std::move(filename), std::move(strategy));
+    }
+}  // namespace strategy
+
 namespace experimental {
     static inline Config tune_callback(
         std::string filename,
-        AnyTuningStrategy strategy,
+        Strategy strategy,
         const KernelBuilder& builder,
         std::function<double(const Config&)> callback) {
         TuningCache cache;
@@ -158,7 +172,7 @@ namespace experimental {
     template<typename... Args>
     static inline Config tune_kernel(
         std::string filename,
-        AnyTuningStrategy strategy,
+        Strategy strategy,
         const KernelBuilder& builder,
         Kernel<Args...>& kernel,
         dim3 problem_size,

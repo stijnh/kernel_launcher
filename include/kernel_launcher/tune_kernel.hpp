@@ -13,7 +13,7 @@ struct RawTuneKernel {
     RawTuneKernel(
         KernelBuilder builder,
         std::vector<Type> parameter_types,
-        AnyTuningStrategy strategy = {},
+        Strategy strategy = {},
         std::unique_ptr<Compiler> compiler =
             std::make_unique<NvrtcCompiler>()) :
         builder_(std::make_unique<KernelBuilder>(std::move(builder))),
@@ -45,7 +45,7 @@ struct RawTuneKernel {
     } state_ = state_uninitialized;
 
     std::unique_ptr<KernelBuilder> builder_;
-    AnyTuningStrategy strategy_;
+    Strategy strategy_;
     std::unique_ptr<Compiler> compiler_;
     std::vector<Type> parameter_types_;
 
@@ -70,7 +70,7 @@ struct TuneKernel {
 
     TuneKernel(
         KernelBuilder builder,
-        AnyTuningStrategy strategy = {},
+        Strategy strategy = {},
         std::unique_ptr<Compiler> compiler = {}) :
         kernel_(
             std::move(builder),
@@ -80,7 +80,7 @@ struct TuneKernel {
 
     static TuneKernel load(
         KernelBuilder builder,
-        AnyTuningStrategy strategy = {},
+        Strategy strategy = {},
         std::unique_ptr<Compiler> compiler = {}) {
         return TuneKernel(
             std::move(builder),
@@ -90,7 +90,7 @@ struct TuneKernel {
 
     void initialize(
         KernelBuilder builder,
-        AnyTuningStrategy strategy = {},
+        Strategy strategy = {},
         std::unique_ptr<Compiler> compiler = {}) {
         *this = TuneKernel(
             std::move(builder),
