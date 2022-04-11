@@ -45,6 +45,12 @@ TunableParam ConfigSpace::create_param(
     Type type,
     std::vector<TunableValue> values,
     TunableValue default_value) {
+    for (const auto& p : params_) {
+        if (p.name() == name) {
+            throw std::runtime_error("duplicate parameter '" + name + "'");
+        }
+    }
+
     TunableParam p = TunableParam(name, type, values, default_value);
     params_.push_back(p);
     return p;

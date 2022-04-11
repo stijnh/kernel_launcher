@@ -33,7 +33,7 @@ struct Type {
         return this->inner_ == that.inner_;
     }
 
-    bool operator!=(const Type& that) const  {
+    bool operator!=(const Type& that) const {
         return !(*this == that);
     }
 

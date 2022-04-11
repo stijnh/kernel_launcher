@@ -438,6 +438,9 @@ struct TunableParam {
         Type type,
         std::vector<TunableValue> values,
         TunableValue default_value) {
+        KERNEL_LAUNCHER_ASSERT(!name.empty());
+        KERNEL_LAUNCHER_ASSERT(!values.empty());
+
         inner_ = std::make_shared<Impl>(
             std::move(name),
             std::move(type),

@@ -28,12 +28,21 @@ struct Config {
     static Config
     from_json(const nlohmann::json& json, const ConfigSpace& space);
 
+    bool operator==(const Config& that) const {
+        return inner_ == that.inner_;
+    }
+
+    bool operator!=(const Config& that) const {
+        return !operator==(that);
+    }
+
   private:
     std::unordered_map<TunableParam, TunableValue> inner_;
 };
 
 struct ConfigSpace {
     ConfigSpace() = default;
+    ConfigSpace(ConfigSpace&&) = default;
     explicit ConfigSpace(const ConfigSpace&) = default;
 
     template<typename T, typename It>
