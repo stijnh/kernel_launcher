@@ -18,10 +18,12 @@ link_libraries(kernel_launcher cuda cudart)
 link_libraries(kernel_launcher nvrtc)  # Not offered by CUDA package?
 
 add_subdirectory(examples)
+add_subdirectory(tests)
 
-include(CheckIPOSupported)
-check_ipo_supported(RESULT supported OUTPUT error)
-if( supported )
-    message(STATUS "IPO / LTO enabled")
-    set_property(TARGET kernel_launcher PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-endif()
+## IPO is buggy unfortunately :(
+#include(CheckIPOSupported)
+#check_ipo_supported(RESULT supported OUTPUT error)
+#if( supported )
+#    message(STATUS "IPO / LTO enabled")
+#    set_property(TARGET kernel_launcher PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+#endif()

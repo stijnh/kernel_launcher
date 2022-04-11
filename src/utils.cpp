@@ -2,16 +2,16 @@
 
 namespace kernel_launcher {
 
-static const char* demangle_type_info(const std::type_info& type) {
+static const std::string& demangle_type_info(const std::type_info& type) {
     static std::mutex lock = {};
-    static std::unordered_map<std::type_index, std::string> demangled_names =
+    static std::unordered_map<std::type_index, std::unique_ptr<std::string>> demangled_names =
         {};
 
     std::lock_guard<std::mutex> guard(lock);
     auto it = demangled_names.find(type);
 
     if (it != demangled_names.end()) {
-        return it->second.c_str();
+        return *it->second;
     }
 
     const char* mangled_name = type.name();
@@ -29,12 +29,12 @@ static const char* demangle_type_info(const std::type_info& type) {
             std::string("__cxa_demangle failed for ") + mangled_name);
     }
 
-    auto result = demangled_names.insert({type, undecorated_name});
+    auto result = demangled_names.insert({type, std::make_unique<std::string>(undecorated_name)});
     free(undecorated_name);
-    return result.first->second.c_str();
+    return *result.first->second;
 }
 
-const char* Type::name() const {
+const std::string& Type::name() const {
     return demangle_type_info(inner_);
 }
 }  // namespace kernel_launcher

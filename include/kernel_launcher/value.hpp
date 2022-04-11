@@ -45,6 +45,8 @@ struct TunableValue {
 
     TunableValue(float i) : type_(type_double), double_val_(i) {}
 
+    TunableValue(bool b) : type_(type_bool), bool_val_(b) {}
+
     ~TunableValue() {
         clear();
     }
@@ -225,6 +227,26 @@ struct TunableValue {
         return to_float();
     }
 
+    bool is_bool() const {
+        if (type_ == type_bool) {
+            return true;
+        } else if (type_ == type_int && in_range<bool>(int_val_)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    bool to_bool() const {
+        if (type_ == type_bool) {
+            return bool_val_;
+        } else if (type_ == type_int && in_range<bool>(int_val_)) {
+            return (bool)int_val_;
+        }
+
+        throw CastException(*this, type_of<bool>());
+    }
+
     template<typename T>
     bool is() const {
         return is(TypeIndicator<T> {});
@@ -295,6 +317,10 @@ struct TunableValue {
         return this->is_double();
     }
 
+    bool is(TypeIndicator<bool>) const {
+        return this->is_bool();
+    }
+
     TunableValue to(TypeIndicator<TunableValue>) const {
         return *this;
     }
@@ -309,6 +335,15 @@ struct TunableValue {
 
     float to(TypeIndicator<float>) const {
         return this->to_float();
+    }
+
+    bool to(TypeIndicator<bool>) const {
+        return this->to_bool();
+    }
+
+  public:
+    explicit operator bool() const {
+        return to_bool();
     }
 
 #define FOR_INTEGER(type, human_name)                               \
@@ -352,7 +387,6 @@ struct TunableValue {
     FOR_INTEGER(unsigned int, uint)
     FOR_INTEGER(unsigned long, ulong)
     FOR_INTEGER(unsigned long long, ulonglong)
-    FOR_INTEGER(bool, bool)
 #undef FOR_INTEGER
 
   private:

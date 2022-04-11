@@ -27,13 +27,13 @@ struct Type {
         return inner_;
     }
 
-    const char* name() const;
+    const std::string& name() const;
 
-    bool operator==(const Type& that) {
+    bool operator==(const Type& that) const {
         return this->inner_ == that.inner_;
     }
 
-    bool operator!=(const Type& that) {
+    bool operator!=(const Type& that) const  {
         return !(*this == that);
     }
 
@@ -52,12 +52,12 @@ static inline Type type_of(const T&) {
 }
 
 template<typename T>
-static inline const char* type_name() {
+static inline const std::string& type_name() {
     return Type::of<T>().name();
 }
 
 template<typename T>
-static inline const char* type_name(const T&) {
+static inline const std::string& type_name(const T&) {
     return Type::of<T>().name();
 }
 
@@ -70,6 +70,8 @@ struct TemplateArg {
     TemplateArg(type i) {                                        \
         inner_ = std::string("(" #type ")") + std::to_string(i); \
     }
+
+    CONSTRUCTOR(char);
     CONSTRUCTOR(signed char);
     CONSTRUCTOR(short);
     CONSTRUCTOR(int);
@@ -82,6 +84,7 @@ struct TemplateArg {
     CONSTRUCTOR(unsigned long long);
     CONSTRUCTOR(float);
     CONSTRUCTOR(double);
+    CONSTRUCTOR(long double);
 #undef CONSTRUCTOR
 
     TemplateArg(bool b) {
@@ -105,6 +108,10 @@ struct TemplateArg {
 
     const std::string& get() const {
         return inner_;
+    }
+
+    const std::string& to_string() const {
+        return get();
     }
 
   private:
