@@ -193,13 +193,31 @@ struct CudaDevice {
     CUdevice device_ = -1;
 };
 
+template<typename T = char>
+struct Memory;
+
+template<typename T = char>
+struct MemoryView;
+
 namespace detail {
-    template<typename T, size_t N = sizeof(T), typename = void>
+    template<
+        typename T,
+        size_t N = sizeof(T),
+        typename = typename std::enable_if<std::is_trivial<T>::value>::type>
     struct MemoryFill {
-        static void call(T*, size_t, T) {
-            throw std::runtime_error(
-                std::string("fill not supported for values of type: ")
-                + type_of<T>().name());
+        static void call(T* data, size_t n, T value) {
+            MemoryView<T> view {data, n};
+
+            // Copy initial 32 elements to device
+            size_t initial_size = std::min(n, (size_t)32);
+            std::vector<T> host_data(initial_size, value);
+            view.slice(0, initial_size).copy_from(host_data);
+
+            // Repeatedly copy data, doubling buffer size each time
+            for (size_t k = initial_size; k < n; k *= 2) {
+                size_t len = std::min(n - k, k);
+                view.slice(0, len).copy_to(view.slice(k, len));
+            }
         }
     };
 
@@ -242,10 +260,7 @@ namespace detail {
     };
 }  // namespace detail
 
-template<typename T = char>
-struct Memory;
-
-template<typename T = char>
+template<typename T>
 struct MemoryView {
     MemoryView() {
         device_ptr_ = nullptr;
