@@ -7,6 +7,23 @@
 
 namespace kernel_launcher {
 
+struct Aggregator {
+    Aggregator(size_t max_evals = 20, double max_seconds = 1.0) :
+        max_evals_(max_evals),
+        max_seconds_(max_seconds) {
+        //
+    }
+
+    void reset();
+    void add(dim3 problem_size, double time);
+    bool collect(double& performance);
+
+  private:
+    std::vector<std::pair<dim3, double>> records_;
+    size_t max_evals_;
+    double max_seconds_;
+};
+
 struct RawTuneKernel {
     RawTuneKernel() = default;
 
@@ -14,12 +31,13 @@ struct RawTuneKernel {
         KernelBuilder builder,
         std::vector<Type> parameter_types,
         Strategy strategy = {},
-        std::unique_ptr<Compiler> compiler =
-            std::make_unique<NvrtcCompiler>()) :
+        std::unique_ptr<Compiler> compiler = std::make_unique<NvrtcCompiler>(),
+        Aggregator aggregator = {}) :
         builder_(std::make_unique<KernelBuilder>(std::move(builder))),
         strategy_(std::move(strategy)),
         compiler_(std::move(compiler)),
-        parameter_types_(std::move(parameter_types)) {
+        parameter_types_(std::move(parameter_types)),
+        aggregator_(std::move(aggregator)) {
         if (!strategy_) {
             strategy_ = RandomStrategy();
         }
@@ -56,9 +74,9 @@ struct RawTuneKernel {
     RawKernel best_kernel_;
 
     Config current_config_;
-    double current_time_ = 0;
-    uint64_t current_workload_ = 0;
     RawKernel current_kernel_;
+    dim3 current_problem_;
+    Aggregator aggregator_;
     bool first_run_;
 };
 

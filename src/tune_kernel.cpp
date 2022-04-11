@@ -2,6 +2,32 @@
 
 namespace kernel_launcher {
 
+void Aggregator::reset() {
+    records_.clear();
+}
+
+void Aggregator::add(dim3 problem_size, double time) {
+    records_.push_back({problem_size, time});
+}
+
+bool Aggregator::collect(double& performance) {
+    double total_time = 0.0;
+    double total_workload = 0.0;
+
+    for (auto p : records_) {
+        total_workload += p.first.x * p.first.y * p.first.z;
+        total_time += p.second;
+    }
+
+    // We need more runs if we have not reached max_evals_ or max_seconds_
+    if (records_.size() < max_evals_ && total_time < max_seconds_) {
+        return false;
+    }
+
+    performance = total_workload / total_time;
+    return true;
+}
+
 void RawTuneKernel::launch(
     cudaStream_t stream,
     dim3 problem_size,
@@ -16,12 +42,12 @@ void RawTuneKernel::launch(
         // Measure performance of kernel
         else if (state_ == state_measuring) {
             after_event_.synchronize();
-            current_time_ += after_event_.seconds_elapsed_since(before_event_);
+            double time = after_event_.seconds_elapsed_since(before_event_);
+            aggregator_.add(current_problem_, time);
             state_ = state_tuning;
 
-            if (current_time_ > 1.0) {
-                double performance = current_workload_ / current_time_;
-
+            double performance;
+            if (aggregator_.collect(performance)) {
                 if (performance > best_performance_) {
                     best_kernel_ = std::exchange(current_kernel_, {});
                     best_performance_ = performance;
@@ -45,9 +71,7 @@ void RawTuneKernel::launch(
             current_kernel_.launch(stream, problem_size, args);
             after_event_.record(stream);
 
-            uint64_t workload =
-                problem_size.x * problem_size.y * problem_size.z;
-            current_workload_ += workload;
+            current_problem_ = problem_size;
             state_ = state_measuring;
             return;
         }
@@ -78,8 +102,7 @@ void RawTuneKernel::next_configuration() {
     state_ = state_compiling;
     current_kernel_ =
         builder_->compile(current_config_, parameter_types_, *compiler_);
-    current_workload_ = 0;
-    current_time_ = 0;
+    aggregator_.reset();
 }
 
 }  // namespace kernel_launcher
