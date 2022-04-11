@@ -18,7 +18,6 @@ struct TuningCache {
 
   private:
     std::string filename_;
-    bool initialized_ = false;
     std::unordered_map<std::string, double> cache_ {};
     std::vector<TunableParam> parameters_ {};
 };

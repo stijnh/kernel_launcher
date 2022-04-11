@@ -122,7 +122,6 @@ bool TuningCache::initialize(
     const KernelBuilder& builder,
     Config& best_config) {
     filename_ = std::move(filename);
-    initialized_ = true;
     parameters_.clear();
     cache_.clear();
 
@@ -131,6 +130,10 @@ bool TuningCache::initialize(
     std::sort(parameters_.begin(), parameters_.end(), [](auto a, auto b) {
         return a.name() < b.name();
     });
+
+    if (filename_.empty()) {
+        return false;
+    }
 
     std::ifstream stream(filename_.c_str());
 
@@ -193,9 +196,12 @@ config_to_key(const Config& config, const std::vector<TunableParam>& params) {
 }
 
 void TuningCache::append(const Config& config, double performance) {
-    KERNEL_LAUNCHER_ASSERT(initialized_);
     std::string key = config_to_key(config, parameters_);
     cache_[key] = performance;
+
+    if (filename_.empty()) {
+        return;
+    }
 
     json record = {
         {"key", std::move(key)},

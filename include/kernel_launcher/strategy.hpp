@@ -36,12 +36,14 @@ struct AnyTuningStrategy: TuningStrategy {
     }
 
     bool init(const KernelBuilder& builder, Config& config) override {
-        if (!inner_) return false;
+        if (!inner_)
+            return false;
         return inner_->init(builder, config);
     }
 
     bool submit(double performance, Config& config) override {
-        if (!inner_) return false;
+        if (!inner_)
+            return false;
         return inner_->submit(performance, config);
     }
 
