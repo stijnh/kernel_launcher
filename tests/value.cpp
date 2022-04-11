@@ -1,5 +1,6 @@
-#include "catch.hpp"
 #include "kernel_launcher/value.hpp"
+
+#include "catch.hpp"
 
 TEST_CASE("test TunableParam") {
     using kernel_launcher::TunableParam;
@@ -250,7 +251,8 @@ TEST_CASE("test TunableValue") {
     }
 
     SECTION("string looooong") {
-        static constexpr const char* MSG = "this is a long string that will defeat SSO";
+        static constexpr const char* MSG =
+            "this is a long string that will defeat SSO";
         TunableValue val(MSG);
 
         CHECK_FALSE(val.is_empty());

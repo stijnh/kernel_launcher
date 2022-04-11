@@ -5,8 +5,8 @@ namespace kl = kernel_launcher;
 
 TEST_CASE("Type") {
     using kl::Type;
-    using kl::type_of;
     using kl::type_name;
+    using kl::type_of;
 
     Type int_type = Type::of<int>();
     Type float_type = Type::of<float>();
@@ -23,15 +23,15 @@ TEST_CASE("Type") {
 }
 
 TEST_CASE("TemplateArg") {
-    using kl::TemplateArg;
     using kl::template_arg;
+    using kl::TemplateArg;
     using kl::type_of;
 
     CHECK(template_arg(true).get() == "(bool)true");
     CHECK(template_arg(false).get() == "(bool)false");
-    CHECK(template_arg((char) 1).get() == "(char)1");
+    CHECK(template_arg((char)1).get() == "(char)1");
     CHECK(template_arg((unsigned char)1).get() == "(unsigned char)1");
-    CHECK(template_arg((signed char) 1).get() == "(signed char)1");
+    CHECK(template_arg((signed char)1).get() == "(signed char)1");
     CHECK(template_arg(1).get() == "(int)1");
     CHECK(template_arg(1u).get() == "(unsigned int)1");
     CHECK(template_arg(1l).get() == "(long)1");
