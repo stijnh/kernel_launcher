@@ -29,7 +29,7 @@ void HillClimbingStrategy::update_best(
     std::fill(attempted_neighbors_.begin(), attempted_neighbors_.end(), false);
     attempted_neighbors_count_ = 0;
     best_performance_ = performance;
-    best_config_ = config;
+    best_config_ = Config(config);
 }
 
 bool HillClimbingStrategy::init(const KernelBuilder& builder, Config& config) {
@@ -57,7 +57,7 @@ bool HillClimbingStrategy::submit(double performance, Config& config) {
     if (performance > best_performance_) {
         update_best(performance, config);
     } else {
-        config = best_config_;  // Reset config
+        config = Config(best_config_);  // Reset config
     }
 
     while (attempted_neighbors_count_ < neighbors_.size()) {

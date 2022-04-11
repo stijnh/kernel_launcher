@@ -1,5 +1,8 @@
 #pragma once
 
+#include <random>
+#include <unordered_set>
+
 #include "kernel_launcher/expr.hpp"
 #include "kernel_launcher/utils.hpp"
 #include "kernel_launcher/value.hpp"
@@ -11,10 +14,10 @@ struct ConfigIterator;
 
 struct Config {
     Config() = default;
-    explicit Config(const Config&) = default;
     Config(Config&&) = default;
+    explicit Config(const Config&) = default;
     Config& operator=(Config&&) = default;
-    Config& operator=(const Config&) = default;
+    Config& operator=(const Config&) = delete;
 
     const TunableValue& operator[](const TunableParam& param) const {
         return at(param);
@@ -44,6 +47,8 @@ struct ConfigSpace {
     ConfigSpace() = default;
     ConfigSpace(ConfigSpace&&) = default;
     explicit ConfigSpace(const ConfigSpace&) = default;
+    ConfigSpace& operator=(ConfigSpace&&) = default;
+    ConfigSpace& operator=(const ConfigSpace&) = delete;
 
     template<typename T, typename It>
     ParamExpr<T> tune(std::string name, It begin, It end, T default_value) {
@@ -127,8 +132,12 @@ struct ConfigSpace {
 };
 
 struct ConfigIterator {
-    explicit ConfigIterator(const ConfigIterator&) = default;
     ConfigIterator() = default;
+    ConfigIterator(ConfigIterator&&) = default;
+    explicit ConfigIterator(const ConfigIterator&) = default;
+    ConfigIterator& operator=(ConfigIterator&&) = default;
+    ConfigIterator& operator=(const ConfigIterator&) = delete;
+
     ConfigIterator(ConfigSpace space) : space_(std::move(space)) {
         reset();
     }
@@ -138,10 +147,9 @@ struct ConfigIterator {
 
   private:
     ConfigSpace space_;
-    uint64_t index_;
     uint64_t size_;
-    uint64_t log4_;
-    std::array<uint32_t, 4> murmur_rounds_;
+    std::default_random_engine rng_;
+    std::unordered_set<uint64_t> visited_;
 };
 
 }  // namespace kernel_launcher

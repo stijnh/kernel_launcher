@@ -158,7 +158,7 @@ namespace experimental {
 
             if (performance > best_performance) {
                 best_performance = performance;
-                best_config = current;
+                best_config = Config(current);
             }
 
             if (!strategy.submit(performance, current)) {

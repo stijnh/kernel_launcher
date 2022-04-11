@@ -197,64 +197,22 @@ nlohmann::json ConfigSpace::to_json() const {
 }
 
 void ConfigIterator::reset() {
-    index_ = 0;
     size_ = space_.size();
-
-    log4_ = 1;
-    while (size_ >= (1 << (2 * log4_))) {
-        log4_ += 1;
-    }
-
-    std::random_device device;
-    for (uint32_t& seed : murmur_rounds_) {
-        seed = device();
-    }
-}
-
-static uint32_t murmur_hash2(uint32_t key, uint32_t seed) {
-    const uint32_t m = 0x5bd1e995;
-    uint32_t h = seed;
-    uint32_t k = key;
-    k *= m;
-    k ^= k >> 24;
-    k *= m;
-    h *= m;
-    h ^= k;
-    h ^= h >> 13;
-    h *= m;
-    h ^= h >> 15;
-    return h;
-}
-
-template<size_t Rounds>
-static uint64_t encrypt_index(
-    uint64_t index,
-    uint64_t half_bits,
-    std::array<uint32_t, Rounds> seeds) {
-    uint64_t mask = (1 << half_bits) - 1;
-
-    // break our index into the left and right half
-    uint32_t left = (uint32_t)((index >> half_bits) & mask);
-    uint32_t right = (uint32_t)((index & mask));
-
-    // do 4 feistel rounds
-    for (uint32_t seed : seeds) {
-        uint32_t new_left = right;
-        uint32_t new_right = (left ^ murmur_hash2(right, seed)) & mask;
-        left = new_left;
-        right = new_right;
-    }
-
-    // put the left and right back together to form the encrypted index
-    return uint64_t(left << half_bits) | uint64_t(right);
+    visited_.clear();
+    rng_ = std::default_random_engine {std::random_device {}()};
 }
 
 bool ConfigIterator::next(Config& config) {
-    while (index_ < (1 << (2 * log4_))) {
-        uint64_t result = encrypt_index(index_, log4_, murmur_rounds_);
-        index_++;
+    while (visited_.size() < size_) {
+        std::uniform_int_distribution<uint64_t> dist {0, size_ - 1};
+        uint64_t index = dist(rng_);
 
-        if (result < size_ && space_.get(result, config)) {
+        auto p = visited_.insert(index);
+        if (p.second) {
+            continue;
+        }
+
+        if (space_.get(index, config)) {
             return true;
         }
     }
