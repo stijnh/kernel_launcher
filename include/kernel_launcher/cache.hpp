@@ -5,10 +5,6 @@
 namespace kernel_launcher {
 
 struct TuningCache {
-    TuningCache() {
-        //
-    }
-
     bool initialize(
         std::string filename,
         const KernelBuilder& builder,
@@ -17,7 +13,7 @@ struct TuningCache {
     bool find(const Config& config, double& performance) const;
 
   private:
-    std::string filename_;
+    std::string filename_ = {};
     std::unordered_map<std::string, double> cache_ {};
     std::vector<TunableParam> parameters_ {};
 };

@@ -18,6 +18,20 @@ struct CastException: std::runtime_error {
 };
 
 struct TunableValue {
+    enum class DataType {
+        empty_,
+        int_,
+        double_,
+        string_,
+        bool_,
+    };
+
+    static constexpr DataType type_empty = DataType::empty_;
+    static constexpr DataType type_int = DataType::int_;
+    static constexpr DataType type_double = DataType::double_;
+    static constexpr DataType type_string = DataType::string_;
+    static constexpr DataType type_bool = DataType::bool_;
+
     template<typename T>
     struct TypeIndicator {};
 
@@ -37,10 +51,6 @@ struct TunableValue {
 
     TunableValue(const std::string& value) : TunableValue(value.c_str()) {}
 
-    TunableValue(Type t) : TunableValue(t.name()) {}
-
-    TunableValue(TemplateArg t) : TunableValue(t.get()) {}
-
     TunableValue(double i) : type_(type_double), double_val_(i) {}
 
     TunableValue(float i) : type_(type_double), double_val_(i) {}
@@ -53,6 +63,10 @@ struct TunableValue {
 
     void clear() {
         type_ = type_empty;
+    }
+
+    DataType data_type() const {
+        return type_;
     }
 
     TunableValue& operator=(const TunableValue& val) {
@@ -389,14 +403,10 @@ struct TunableValue {
     FOR_INTEGER(unsigned long long, ulonglong)
 #undef FOR_INTEGER
 
+    friend std::ostream& operator<<(std::ostream& s, const TunableValue& point);
+
   private:
-    enum {
-        type_empty,
-        type_int,
-        type_double,
-        type_string,
-        type_bool,
-    } type_ = type_empty;
+    DataType type_ = DataType::empty_;
 
     union {
         intmax_t int_val_;

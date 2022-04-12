@@ -35,4 +35,9 @@ const std::string& intern_string(const char* input) {
 
     return *(it->second.get());
 }
+
+std::ostream& operator<<(std::ostream& s, const TunableValue& val) {
+    return s << val.to_json();
+}
+
 }  // namespace kernel_launcher
