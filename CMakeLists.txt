@@ -7,7 +7,7 @@ add_library(kernel_launcher ${sources})
 
 include_directories(include)
 include_directories(thirdparty)
-add_compile_options(-Wall -Wextra -pedantic)
+add_compile_options(-Wall -Wextra -pedantic -Wconversion -Werror)
 
 find_package(Threads REQUIRED)
 link_libraries(kernel_launcher Threads::Threads)
