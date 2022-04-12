@@ -72,6 +72,10 @@ struct ParamExpr: BaseExpr<T> {
         };
     }
 
+    const TunableParam& parameter() const {
+        return _param;
+    }
+
   private:
     TunableParam _param;
 };

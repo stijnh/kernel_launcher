@@ -87,10 +87,35 @@ bool ConfigSpace::get(uint64_t index, Config& config) const {
         config.insert(p, p[i]);
     }
 
-    return is_valid(config);
+    Eval eval = {config.get()};
+
+    for (const auto& r : restrictions_) {
+        if (!eval(r)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 bool ConfigSpace::is_valid(const Config& config) const {
+    if (config.size() != params_.size()) {
+        return false;
+    }
+
+    for (const auto& p : params_) {
+        TunableValue value = config[p];
+        bool is_allowed = false;
+
+        for (const auto& allowed_value : p.values()) {
+            is_allowed |= value == allowed_value;
+        }
+
+        if (!is_allowed) {
+            return false;
+        }
+    }
+
     Eval eval = {config.get()};
 
     for (const auto& r : restrictions_) {
@@ -199,18 +224,29 @@ nlohmann::json ConfigSpace::to_json() const {
 void ConfigIterator::reset() {
     size_ = space_.size();
     visited_.clear();
+    remaining_ = size_;
     rng_ = std::default_random_engine {std::random_device {}()};
 }
 
 bool ConfigIterator::next(Config& config) {
-    while (visited_.size() < size_) {
+    while (remaining_ > 0) {
         std::uniform_int_distribution<uint64_t> dist {0, size_ - 1};
         uint64_t index = dist(rng_);
 
-        auto p = visited_.insert(index);
-        if (p.second) {
+        uint64_t word_offset = index / 64;
+        uint64_t bit_offset = index % 64;
+
+        uint64_t mask = 1 << bit_offset;
+        uint64_t& word = visited_[word_offset];
+
+        // Bit already set, continue
+        if ((word & mask) != 0) {
             continue;
         }
+
+        // Set bit to 1
+        word |= mask;
+        remaining_--;
 
         if (space_.get(index, config)) {
             return true;

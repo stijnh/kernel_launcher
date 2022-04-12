@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "kernel_launcher/expr.hpp"
+#include "kernel_launcher/module.hpp"
 #include "kernel_launcher/utils.hpp"
 #include "kernel_launcher/value.hpp"
 
@@ -19,8 +20,17 @@ struct Config {
     Config& operator=(Config&&) = default;
     Config& operator=(const Config&) = delete;
 
+    template<typename T>
+    T operator[](const ParamExpr<T>& expr) const {
+        return at(expr.parameter()).template to<T>();
+    }
+
     const TunableValue& operator[](const TunableParam& param) const {
         return at(param);
+    }
+
+    size_t size() const {
+        return inner_.size();
     }
 
     const TunableValue& at(const TunableParam& param) const;
@@ -149,7 +159,8 @@ struct ConfigIterator {
     ConfigSpace space_;
     uint64_t size_;
     std::default_random_engine rng_;
-    std::unordered_set<uint64_t> visited_;
+    std::unordered_map<uint64_t, uint64_t> visited_;
+    size_t remaining_;
 };
 
 }  // namespace kernel_launcher
