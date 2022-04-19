@@ -151,8 +151,92 @@ struct TuneKernel {
 
     RawTuneKernel kernel_;
 };
+
+namespace experimental {
+    static inline Config tune(
+        std::string filename,
+        Strategy strategy,
+        const KernelBuilder& builder,
+        const std::function<double(const Config&)>& callback) {
+        TuningCache cache;
+        Config current;
+        Config best_config;
+        double best_performance = -1e99;
+
+        if (cache.open(std::move(filename), builder, current)) {
+            return current;
+        }
+
+        if (!strategy.init(builder, current)) {
+            throw std::runtime_error("");
+        }
+
+        while (true) {
+            double performance;
+
+            if (!cache.find(current, performance)) {
+                performance = callback(current);
+                cache.append(current, performance);
+            }
+
+            if (performance > best_performance) {
+                best_performance = performance;
+                best_config = Config(current);
+            }
+
+            if (!strategy.submit(performance, current)) {
+                break;
+            }
+        }
+
+        return best_config;
+    }
+
+    template<typename... Args>
+    static inline Config tune_kernel(
+        std::string filename,
+        Strategy strategy,
+        const KernelBuilder& builder,
+        KernelResults results,
+        Kernel<Args...>& kernel,
+        dim3 problem_size,
+        Args... args) {
+        Config best_config = tune(
+            std::move(filename),
+            builder,
+            std::move(strategy),
+            [&](const Config& config) -> double {
+                results.reset();
+                CudaEvent before_event;
+                CudaEvent after_event;
+                cudaStream_t stream = nullptr;
+
+                auto kernel = Kernel<Args...>::compile(builder, config);
+
+                while (true) {
+                    before_event.record(stream);
+                    kernel.instantiate(problem_size, stream).launch(args...);
+                    after_event.record(stream);
+                    after_event.synchronize();
+
+                    double time =
+                        after_event.seconds_elapsed_since(before_event);
+                    results.add(problem_size, time);
+
+                    double performance;
+                    if (results.collect(performance)) {
+                        return performance;
+                    }
+                }
+            });
+
+        kernel.initialize(builder, best_config);
+        return best_config;
+    }
+}  // namespace experimental
+
 }  // namespace kernel_launcher
 
 #if KERNEL_LAUNCHER_HEADERONLY
-#include KERNEL_LAUNCHER_IMPL("tune_kernel.cpp")
+    #include KERNEL_LAUNCHER_IMPL("tune_kernel.cpp")
 #endif
