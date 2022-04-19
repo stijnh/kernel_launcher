@@ -74,6 +74,7 @@ static inline std::string arch_flag(CUdevice* device_opt) {
     return oss.str();
 }
 
+KERNEL_LAUNCHER_API
 std::future<CudaModule> NvrtcCompiler::compile(
     const Source& kernel_source,
     const std::string& kernel_name,
@@ -158,6 +159,7 @@ std::future<CudaModule> NvrtcCompiler::compile(
     }
 }
 
+KERNEL_LAUNCHER_API
 std::future<CudaModule> AsyncCompiler::compile(
     const Source& kernel_source,
     const std::string& kernel_name,

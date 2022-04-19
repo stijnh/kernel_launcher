@@ -163,3 +163,7 @@ struct AsyncCompiler: CompilerBase {
 };
 
 }  // namespace kernel_launcher
+
+#if KERNEL_LAUNCHER_HEADERONLY
+    #include KERNEL_LAUNCHER_IMPL("compile.cpp")
+#endif

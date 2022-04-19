@@ -3,10 +3,9 @@
 #include <random>
 #include <unordered_set>
 
-#include "../include/kernel_launcher/config.hpp"
-
 namespace kernel_launcher {
 
+KERNEL_LAUNCHER_API
 const TunableValue& Config::at(const TunableParam& param) const {
     auto it = inner_.find(param);
 
@@ -18,14 +17,17 @@ const TunableValue& Config::at(const TunableParam& param) const {
     return it->second;
 }
 
+KERNEL_LAUNCHER_API
 const std::unordered_map<TunableParam, TunableValue>& Config::get() const {
     return inner_;
 }
 
+KERNEL_LAUNCHER_API
 void Config::insert(TunableParam p, TunableValue v) {
     inner_[std::move(p)] = std::move(v);
 }
 
+KERNEL_LAUNCHER_API
 nlohmann::json Config::to_json() const {
     std::unordered_map<std::string, nlohmann::json> results;
 
@@ -36,10 +38,12 @@ nlohmann::json Config::to_json() const {
     return results;
 }
 
+KERNEL_LAUNCHER_API
 Config Config::from_json(const nlohmann::json& json, const ConfigSpace& space) {
     return space.load_config(json);
 }
 
+KERNEL_LAUNCHER_API
 TunableParam ConfigSpace::create_param(
     std::string name,
     Type type,
@@ -56,10 +60,12 @@ TunableParam ConfigSpace::create_param(
     return p;
 }
 
+KERNEL_LAUNCHER_API
 void ConfigSpace::restrict(Expr<bool> expr) {
     restrictions_.push_back(std::move(expr));
 }
 
+KERNEL_LAUNCHER_API
 uint64_t ConfigSpace::size() const {
     uint64_t n = 1;
     for (const auto& p : params_) {
@@ -78,6 +84,7 @@ uint64_t ConfigSpace::size() const {
     return n;
 }
 
+KERNEL_LAUNCHER_API
 bool ConfigSpace::get(uint64_t index, Config& config) const {
     for (const auto& p : params_) {
         uint64_t n = (uint64_t)p.size();
@@ -98,6 +105,7 @@ bool ConfigSpace::get(uint64_t index, Config& config) const {
     return true;
 }
 
+KERNEL_LAUNCHER_API
 bool ConfigSpace::is_valid(const Config& config) const {
     if (config.size() != params_.size()) {
         return false;
@@ -127,6 +135,7 @@ bool ConfigSpace::is_valid(const Config& config) const {
     return true;
 }
 
+KERNEL_LAUNCHER_API
 Config ConfigSpace::random_config() const {
     Config config;
     if (iterate().next(config)) {
@@ -136,6 +145,7 @@ Config ConfigSpace::random_config() const {
     }
 }
 
+KERNEL_LAUNCHER_API
 Config ConfigSpace::default_config() const {
     Config config;
 
@@ -154,6 +164,7 @@ Config ConfigSpace::default_config() const {
     return config;
 }
 
+KERNEL_LAUNCHER_API
 Config ConfigSpace::load_config(const nlohmann::json& obj) const {
     Config config;
 
@@ -183,6 +194,7 @@ Config ConfigSpace::load_config(const nlohmann::json& obj) const {
     return config;
 }
 
+KERNEL_LAUNCHER_API
 const TunableParam& ConfigSpace::at(const char* s) const {
     for (const auto& param : params_) {
         if (param.name() == s) {
@@ -193,10 +205,12 @@ const TunableParam& ConfigSpace::at(const char* s) const {
     throw std::runtime_error(std::string("parameter not found: ") + s);
 }
 
+KERNEL_LAUNCHER_API
 ConfigIterator ConfigSpace::iterate() const {
     return *this;
 }
 
+KERNEL_LAUNCHER_API
 nlohmann::json ConfigSpace::to_json() const {
     using nlohmann::json;
     json results = json::object();
@@ -221,6 +235,7 @@ nlohmann::json ConfigSpace::to_json() const {
     return results;
 }
 
+KERNEL_LAUNCHER_API
 void ConfigIterator::reset() {
     size_ = space_.size();
     visited_.clear();
@@ -228,6 +243,7 @@ void ConfigIterator::reset() {
     rng_ = std::default_random_engine {std::random_device {}()};
 }
 
+KERNEL_LAUNCHER_API
 bool ConfigIterator::next(Config& config) {
     while (remaining_ > 0) {
         std::uniform_int_distribution<uint64_t> dist {0, size_ - 1};

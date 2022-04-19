@@ -45,10 +45,13 @@ struct BaseExpr {
     virtual ~BaseExpr() = default;
     virtual std::string to_string() const = 0;
     virtual return_type eval(const Eval& eval) const = 0;
+
+#if KERNEL_LAUNCHER_JSON
     virtual nlohmann::json to_json() const {
         throw std::runtime_error(
             "expression cannot be converted to json: " + to_string());
     }
+#endif
 };
 
 template<typename T>
@@ -65,12 +68,14 @@ struct ParamExpr: BaseExpr<T> {
         return eval.lookup<T>(_param);
     }
 
+#if KERNEL_LAUNCHER_JSON
     nlohmann::json to_json() const override {
         return {
             {"operator", "parameter"},
             {"name", _param.name()},
         };
     }
+#endif
 
     const TunableParam& parameter() const {
         return _param;
@@ -96,10 +101,12 @@ struct ScalarExpr: BaseExpr<T> {
         return _value;
     }
 
+#if KERNEL_LAUNCHER_JSON
     // TODO: Add to_json for arbitrary T
     //    nlohmann::json to_json() const override {
     //        return TunableValue(_value).to_json();
     //    }
+#endif
 
   private:
     T _value;
@@ -355,6 +362,7 @@ struct ConvertExpr: BaseExpr<O> {
         return detail::CastHelper<I, O>::call(eval(inner_));
     }
 
+#if KERNEL_LAUNCHER_JSON
     nlohmann::json to_json() const override {
         return {
             {"operator", "convert"},
@@ -362,6 +370,7 @@ struct ConvertExpr: BaseExpr<O> {
             {"operand", inner_.to_json()},
         };
     }
+#endif
 
   private:
     E inner_;
@@ -381,9 +390,11 @@ struct ConvertExpr<E, I, I>: BaseExpr<I> {
         return eval(inner_);
     }
 
+#if KERNEL_LAUNCHER_JSON
     nlohmann::json to_json() const override {
         return inner_.to_json();
     }
+#endif
 
   private:
     E inner_;
@@ -415,6 +426,7 @@ struct CondExpr: BaseExpr<O> {
         return eval(cond_) ? eval(left_) : eval(right_);
     }
 
+#if KERNEL_LAUNCHER_JSON
     nlohmann::json to_json() const override {
         return {
             {"operator", "conditional"},
@@ -423,6 +435,7 @@ struct CondExpr: BaseExpr<O> {
             {"right", right_.to_json()},
         };
     }
+#endif
 
   private:
     C cond_;
@@ -459,12 +472,18 @@ struct Expr: BaseExpr<T> {
         return inner_->to_string();
     }
 
+#if KERNEL_LAUNCHER_JSON
     nlohmann::json to_json() const override {
         return inner_->to_json();
     }
+#endif
 
   private:
     std::shared_ptr<BaseExpr<T>> inner_ {};
 };
 
 }  // namespace kernel_launcher
+
+#if KERNEL_LAUNCHER_HEADERONLY
+    #include KERNEL_LAUNCHER_IMPL("expr.cpp")
+#endif

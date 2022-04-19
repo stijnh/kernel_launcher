@@ -35,6 +35,7 @@ static const std::string& demangle_type_info(const std::type_info& type) {
     return *result.first->second;
 }
 
+KERNEL_LAUNCHER_API
 const std::string& Type::name() const {
     return demangle_type_info(inner_);
 }

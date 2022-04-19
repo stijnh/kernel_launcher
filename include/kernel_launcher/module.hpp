@@ -479,3 +479,7 @@ struct MemoryView: MemoryBase<MemoryView<T>, T> {
 };
 
 }  // namespace kernel_launcher
+
+#if KERNEL_LAUNCHER_HEADERONLY
+    #include KERNEL_LAUNCHER_IMPL("module.cpp")
+#endif

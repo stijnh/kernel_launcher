@@ -18,3 +18,7 @@ struct TuningCache {
     std::vector<TunableParam> parameters_ {};
 };
 }  // namespace kernel_launcher
+
+#if KERNEL_LAUNCHER_HEADERONLY
+    #include KERNEL_LAUNCHER_IMPL("cache.cpp")
+#endif

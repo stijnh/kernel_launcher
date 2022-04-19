@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 namespace kernel_launcher {
+KERNEL_LAUNCHER_API
 const std::string& intern_string(const char* input) {
     auto equal = [](const char* a, const char* b) { return strcmp(a, b) == 0; };
     auto hash = [](const char* v) {
@@ -36,6 +37,7 @@ const std::string& intern_string(const char* input) {
     return *(it->second.get());
 }
 
+KERNEL_LAUNCHER_API
 std::ostream& operator<<(std::ostream& s, const TunableValue& val) {
     return s << val.to_json();
 }

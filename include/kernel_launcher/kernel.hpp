@@ -6,7 +6,10 @@
 #include "kernel_launcher/config.hpp"
 #include "kernel_launcher/expr.hpp"
 #include "kernel_launcher/utils.hpp"
-#include "nlohmann/json.hpp"
+
+#if KERNEL_LAUNCHER_JSON
+    #include "nlohmann/json.hpp"
+#endif
 
 namespace kernel_launcher {
 
@@ -115,7 +118,9 @@ struct KernelBuilder: ConfigSpace {
         const std::vector<Type>& parameter_types,
         const CompilerBase& compiler = DEFAULT_COMPILER) const;
 
+#if KERNEL_LAUNCHER_JSON
     nlohmann::json to_json() const;
+#endif
 
   private:
     Source kernel_source_;
@@ -232,3 +237,7 @@ struct Kernel {
 };
 
 }  // namespace kernel_launcher
+
+#if KERNEL_LAUNCHER_HEADERONLY
+    #include KERNEL_LAUNCHER_IMPL("kernel.cpp")
+#endif

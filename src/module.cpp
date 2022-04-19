@@ -26,6 +26,7 @@ static std::string cu_error_message(
     return buf;
 }
 
+KERNEL_LAUNCHER_API
 CuException::CuException(
     CUresult err,
     const char* message,

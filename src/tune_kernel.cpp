@@ -2,14 +2,17 @@
 
 namespace kernel_launcher {
 
+KERNEL_LAUNCHER_API
 void KernelResults::reset() {
     records_.clear();
 }
 
+KERNEL_LAUNCHER_API
 void KernelResults::add(dim3 problem_size, double time) {
     records_.push_back({problem_size, time});
 }
 
+KERNEL_LAUNCHER_API
 bool KernelResults::collect(double& performance) {
     double total_time = 0.0;
     double total_workload = 0.0;
@@ -39,6 +42,7 @@ bool KernelResults::collect(double& performance) {
     return true;
 }
 
+KERNEL_LAUNCHER_API
 void RawTuneKernel::launch(
     cudaStream_t stream,
     dim3 problem_size,
@@ -109,6 +113,7 @@ void RawTuneKernel::launch(
     }
 }
 
+KERNEL_LAUNCHER_API
 void RawTuneKernel::next_configuration() {
     state_ = state_compiling;
     current_kernel_ =

@@ -152,3 +152,7 @@ struct TuneKernel {
     RawTuneKernel kernel_;
 };
 }  // namespace kernel_launcher
+
+#if KERNEL_LAUNCHER_HEADERONLY
+#include KERNEL_LAUNCHER_IMPL("tune_kernel.cpp")
+#endif

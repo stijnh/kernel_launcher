@@ -217,3 +217,7 @@ namespace experimental {
 }  // namespace experimental
 
 }  // namespace kernel_launcher
+
+#if KERNEL_LAUNCHER_HEADERONLY
+#include KERNEL_LAUNCHER_IMPL("strategy.cpp")
+#endif

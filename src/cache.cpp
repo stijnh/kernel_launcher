@@ -195,6 +195,7 @@ config_to_key(const Config& config, const std::vector<TunableParam>& params) {
     return output.str();
 }
 
+KERNEL_LAUNCHER_API
 void TuningCache::append(const Config& config, double performance) {
     std::string key = config_to_key(config, parameters_);
     cache_[key] = performance;
@@ -214,6 +215,7 @@ void TuningCache::append(const Config& config, double performance) {
     stream << "\n" << record;
 }
 
+KERNEL_LAUNCHER_API
 bool TuningCache::find(const Config& config, double& answer) const {
     std::string key = config_to_key(config, parameters_);
     auto it = cache_.find(key);

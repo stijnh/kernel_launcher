@@ -11,6 +11,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include "base.hpp"
+
 namespace kernel_launcher {
 
 struct Type {
@@ -195,3 +197,7 @@ std::vector<T> range(T end) {
 }
 
 }  // namespace kernel_launcher
+
+#if KERNEL_LAUNCHER_HEADERONLY
+    #include KERNEL_LAUNCHER_IMPL("utils.cpp")
+#endif

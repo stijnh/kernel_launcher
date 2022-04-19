@@ -4,25 +4,30 @@
 
 namespace kernel_launcher {
 
+KERNEL_LAUNCHER_API
 bool RandomStrategy::init(const KernelBuilder& builder, Config& config) {
     iter_ = builder.iterate();
     return iter_.next(config);
 }
 
+KERNEL_LAUNCHER_API
 bool RandomStrategy::submit(double, Config& config) {
     return iter_.next(config);
 }
 
+KERNEL_LAUNCHER_API
 bool LimitStrategy::init(const KernelBuilder& builder, Config& config) {
     curr_eval_ = 0;
     return inner_.init(builder, config);
 }
 
+KERNEL_LAUNCHER_API
 bool LimitStrategy::submit(double performance, Config& config) {
     bool x = inner_.submit(performance, config) && curr_eval_++ < max_eval_;
     return x;
 }
 
+KERNEL_LAUNCHER_API
 void HillClimbingStrategy::update_best(
     double performance,
     const Config& config) {
@@ -32,6 +37,7 @@ void HillClimbingStrategy::update_best(
     best_config_ = Config(config);
 }
 
+KERNEL_LAUNCHER_API
 bool HillClimbingStrategy::init(const KernelBuilder& builder, Config& config) {
     rng_ = std::default_random_engine {std::random_device {}()};
     space_ = ConfigSpace(builder);
@@ -53,6 +59,7 @@ bool HillClimbingStrategy::init(const KernelBuilder& builder, Config& config) {
     return space_.size() > 0;
 }
 
+KERNEL_LAUNCHER_API
 bool HillClimbingStrategy::submit(double performance, Config& config) {
     if (performance > best_performance_) {
         update_best(performance, config);
@@ -114,6 +121,7 @@ internal_submit(const TuningCache& cache, BaseStrategy& inner, Config& config) {
     }
 }
 
+KERNEL_LAUNCHER_API
 bool CachingStrategy::init(const KernelBuilder& builder, Config& config) {
     if (!inner_.init(builder, config)) {
         return false;
@@ -131,6 +139,7 @@ bool CachingStrategy::init(const KernelBuilder& builder, Config& config) {
     return internal_submit(cache_, inner_, config);
 }
 
+KERNEL_LAUNCHER_API
 bool CachingStrategy::submit(double performance, Config& config) {
     if (first_run_) {
         first_run_ = false;

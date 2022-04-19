@@ -4,6 +4,7 @@
 
 namespace kernel_launcher {
 
+KERNEL_LAUNCHER_API
 bool RawKernel::ready() const {
     return ready_
         || (future_.valid()
@@ -11,10 +12,12 @@ bool RawKernel::ready() const {
                 == std::future_status::ready);
 }
 
+KERNEL_LAUNCHER_API
 void RawKernel::wait_ready() const {
     return future_.wait();
 }
 
+KERNEL_LAUNCHER_API
 void RawKernel::launch(cudaStream_t stream, dim3 problem_size, void** args) {
     if (!ready_) {
         ready_ = true;
@@ -29,6 +32,7 @@ void RawKernel::launch(cudaStream_t stream, dim3 problem_size, void** args) {
     return module_.launch(grid_size, block_size_, shared_mem_, stream, args);
 }
 
+KERNEL_LAUNCHER_API
 KernelBuilder& KernelBuilder::block_size(
     Expr<uint32_t> x,
     Expr<uint32_t> y,
@@ -40,6 +44,7 @@ KernelBuilder& KernelBuilder::block_size(
     return *this;
 }
 
+KERNEL_LAUNCHER_API
 KernelBuilder& KernelBuilder::grid_divisors(
     Expr<uint32_t> x,
     Expr<uint32_t> y,
@@ -50,21 +55,25 @@ KernelBuilder& KernelBuilder::grid_divisors(
     return *this;
 }
 
+KERNEL_LAUNCHER_API
 KernelBuilder& KernelBuilder::shared_memory(Expr<uint32_t> s) {
     shared_mem_ = std::move(s);
     return *this;
 }
 
+KERNEL_LAUNCHER_API
 KernelBuilder& KernelBuilder::template_arg(Expr<TemplateArg> arg) {
     template_args_.emplace_back(std::move(arg));
     return *this;
 }
 
+KERNEL_LAUNCHER_API
 KernelBuilder& KernelBuilder::compiler_flag(Expr<std::string> opt) {
     compile_flags_.emplace_back(std::move(opt));
     return *this;
 }
 
+KERNEL_LAUNCHER_API
 KernelBuilder&
 KernelBuilder::define(std::string name, Expr<std::string> value) {
     if (defines_.find(name) != defines_.end()) {
@@ -75,12 +84,14 @@ KernelBuilder::define(std::string name, Expr<std::string> value) {
     return *this;
 }
 
+KERNEL_LAUNCHER_API
 KernelBuilder& KernelBuilder::assertion(Expr<bool> fun) {
     restrict(fun);
     assertions_.emplace_back(std::move(fun));
     return *this;
 }
 
+KERNEL_LAUNCHER_API
 std::array<Expr<uint32_t>, 3> KernelBuilder::tune_block_size(
     std::vector<uint32_t> xs,
     std::vector<uint32_t> ys,
@@ -92,6 +103,7 @@ std::array<Expr<uint32_t>, 3> KernelBuilder::tune_block_size(
     return {x, y, z};
 }
 
+KERNEL_LAUNCHER_API
 Expr<std::string> KernelBuilder::tune_compiler_flag(
     std::string name,
     std::vector<std::string> values) {
@@ -100,6 +112,7 @@ Expr<std::string> KernelBuilder::tune_compiler_flag(
     return e;
 }
 
+KERNEL_LAUNCHER_API
 Expr<std::string>
 KernelBuilder::tune_define(std::string name, std::vector<std::string> values) {
     Expr<std::string> e = tune(name, values);
@@ -107,6 +120,7 @@ KernelBuilder::tune_define(std::string name, std::vector<std::string> values) {
     return e;
 }
 
+KERNEL_LAUNCHER_API
 RawKernel KernelBuilder::compile(
     const Config& config,
     const std::vector<Type>& parameter_types,
@@ -160,6 +174,7 @@ RawKernel KernelBuilder::compile(
     return RawKernel(std::move(module), block_size, grid_divisor, shared_mem);
 }
 
+KERNEL_LAUNCHER_API
 nlohmann::json KernelBuilder::to_json() const {
     using nlohmann::json;
     json result = ConfigSpace::to_json();

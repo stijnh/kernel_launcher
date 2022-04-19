@@ -5,7 +5,10 @@
 #include <stdexcept>
 
 #include "kernel_launcher/utils.hpp"
-#include "nlohmann/json.hpp"
+
+#if KERNEL_LAUNCHER_JSON
+    #include "nlohmann/json.hpp"
+#endif
 
 namespace kernel_launcher {
 
@@ -271,6 +274,7 @@ struct TunableValue {
         return to(TypeIndicator<T> {});
     }
 
+#if KERNEL_LAUNCHER_JSON
     nlohmann::json to_json() const {
         using nlohmann::json;
 
@@ -313,6 +317,7 @@ struct TunableValue {
 
         throw std::runtime_error("unknown json object");
     }
+#endif
 
   private:
     bool is(TypeIndicator<TunableValue>) const {
@@ -517,3 +522,7 @@ struct hash<kernel_launcher::TunableValue> {
     }
 };
 }  // namespace std
+
+#if KERNEL_LAUNCHER_HEADERONLY
+    #include KERNEL_LAUNCHER_IMPL("value.cpp")
+#endif

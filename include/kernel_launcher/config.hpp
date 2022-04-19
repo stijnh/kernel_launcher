@@ -37,9 +37,11 @@ struct Config {
     void insert(TunableParam p, TunableValue v);
     const std::unordered_map<TunableParam, TunableValue>& get() const;
 
+#if KERNEL_LAUNCHER_JSON
     nlohmann::json to_json() const;
     static Config
     from_json(const nlohmann::json& json, const ConfigSpace& space);
+#endif
 
     bool operator==(const Config& that) const {
         return inner_ == that.inner_;
@@ -133,8 +135,10 @@ struct ConfigSpace {
     Config default_config() const;
     ConfigIterator iterate() const;
 
+#if KERNEL_LAUNCHER_JSON
     Config load_config(const nlohmann::json& obj) const;
     nlohmann::json to_json() const;
+#endif
 
   private:
     std::vector<TunableParam> params_;
@@ -179,3 +183,7 @@ struct hash<kernel_launcher::Config> {
     }
 };
 }  // namespace std
+
+#if KERNEL_LAUNCHER_HEADERONLY
+    #include KERNEL_LAUNCHER_IMPL("config.cpp")
+#endif
