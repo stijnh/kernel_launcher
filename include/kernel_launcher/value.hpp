@@ -4,7 +4,7 @@
 #include <new>
 #include <stdexcept>
 
-#include "kernel_launcher/utils.hpp"
+#include "utils.hpp"
 
 #if KERNEL_LAUNCHER_JSON
     #include "nlohmann/json.hpp"

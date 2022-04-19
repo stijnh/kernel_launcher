@@ -2,8 +2,8 @@
 
 #include <ios>
 
-#include "kernel_launcher/kernel.hpp"
-#include "kernel_launcher/strategy.hpp"
+#include "kernel.hpp"
+#include "strategy.hpp"
 
 namespace kernel_launcher {
 

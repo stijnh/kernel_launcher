@@ -3,10 +3,10 @@
 #include <random>
 #include <unordered_set>
 
-#include "kernel_launcher/expr.hpp"
-#include "kernel_launcher/module.hpp"
-#include "kernel_launcher/utils.hpp"
-#include "kernel_launcher/value.hpp"
+#include "expr.hpp"
+#include "module.hpp"
+#include "utils.hpp"
+#include "value.hpp"
 
 namespace kernel_launcher {
 

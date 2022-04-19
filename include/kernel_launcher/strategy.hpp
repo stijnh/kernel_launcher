@@ -3,8 +3,8 @@
 #include <random>
 #include <unordered_set>
 
-#include "kernel_launcher/cache.hpp"
-#include "kernel_launcher/kernel.hpp"
+#include "cache.hpp"
+#include "kernel.hpp"
 
 namespace kernel_launcher {
 struct BaseStrategy {

@@ -9,7 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "kernel_launcher/utils.hpp"
+#include "utils.hpp"
 
 namespace kernel_launcher {
 

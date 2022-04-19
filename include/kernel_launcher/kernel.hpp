@@ -2,10 +2,10 @@
 
 #include <array>
 
-#include "kernel_launcher/compile.hpp"
-#include "kernel_launcher/config.hpp"
-#include "kernel_launcher/expr.hpp"
-#include "kernel_launcher/utils.hpp"
+#include "compile.hpp"
+#include "config.hpp"
+#include "expr.hpp"
+#include "utils.hpp"
 
 #if KERNEL_LAUNCHER_JSON
     #include "nlohmann/json.hpp"

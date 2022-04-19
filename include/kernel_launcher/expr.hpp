@@ -3,8 +3,8 @@
 #include <sstream>
 #include <vector>
 
-#include "kernel_launcher/utils.hpp"
-#include "kernel_launcher/value.hpp"
+#include "utils.hpp"
+#include "value.hpp"
 
 namespace kernel_launcher {
 

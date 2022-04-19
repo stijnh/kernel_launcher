@@ -1,6 +1,6 @@
 #pragma once
 
-#include "kernel_launcher/kernel.hpp"
+#include "kernel.hpp"
 
 namespace kernel_launcher {
 
