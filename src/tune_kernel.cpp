@@ -2,19 +2,30 @@
 
 namespace kernel_launcher {
 
-void Aggregator::reset() {
+void KernelResults::reset() {
     records_.clear();
 }
 
-void Aggregator::add(dim3 problem_size, double time) {
+void KernelResults::add(dim3 problem_size, double time) {
     records_.push_back({problem_size, time});
 }
 
-bool Aggregator::collect(double& performance) {
+bool KernelResults::collect(double& performance) {
     double total_time = 0.0;
     double total_workload = 0.0;
 
-    for (auto p : records_) {
+    if (records_.size() < min_evals_ + num_outliers_) {
+        return false;
+    }
+
+    // Sort by time from high to low
+    sort(records_.begin(), records_.end(), [](auto a, auto b) {
+        return a.second > b.second;
+    });
+
+    // Skip the first `num_outliers_' records.
+    for (size_t i = num_outliers_; i < records_.size(); i++) {
+        const auto& p = records_[i];
         total_workload += p.first.x * p.first.y * p.first.z;
         total_time += p.second;
     }

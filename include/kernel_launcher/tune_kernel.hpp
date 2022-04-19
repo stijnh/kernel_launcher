@@ -7,10 +7,16 @@
 
 namespace kernel_launcher {
 
-struct Aggregator {
-    Aggregator(size_t max_evals = 20, double max_seconds = 1.0) :
+struct KernelResults {
+    KernelResults(
+        size_t min_evals = 0,
+        size_t max_evals = 20,
+        double max_seconds = 1.0,
+        size_t num_outliers = 1) :
+        min_evals_(min_evals),
         max_evals_(max_evals),
-        max_seconds_(max_seconds) {
+        max_seconds_(max_seconds),
+        num_outliers_(num_outliers) {
         //
     }
 
@@ -20,8 +26,10 @@ struct Aggregator {
 
   private:
     std::vector<std::pair<dim3, double>> records_;
+    size_t min_evals_;
     size_t max_evals_;
     double max_seconds_;
+    size_t num_outliers_;
 };
 
 struct RawTuneKernel {
@@ -32,7 +40,7 @@ struct RawTuneKernel {
         std::vector<Type> parameter_types,
         Strategy strategy = {},
         Compiler compiler = DEFAULT_COMPILER,
-        Aggregator aggregator = {}) :
+        KernelResults aggregator = {}) :
         builder_(std::make_unique<KernelBuilder>(std::move(builder))),
         strategy_(std::move(strategy)),
         compiler_(std::move(compiler)),
@@ -76,7 +84,7 @@ struct RawTuneKernel {
     Config current_config_;
     RawKernel current_kernel_;
     dim3 current_problem_;
-    Aggregator aggregator_;
+    KernelResults aggregator_;
     bool first_run_;
 };
 

@@ -88,6 +88,8 @@ struct Compiler: CompilerBase {
     Compiler() = default;
     Compiler(const Compiler&) = default;
     Compiler(Compiler&&) = default;
+    Compiler& operator=(const Compiler&) = default;
+    Compiler& operator=(Compiler&&) = default;
 
     template<typename C>
     Compiler(std::shared_ptr<C> inner) : inner_(std::move(inner)) {}

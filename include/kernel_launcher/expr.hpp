@@ -96,9 +96,10 @@ struct ScalarExpr: BaseExpr<T> {
         return _value;
     }
 
-    nlohmann::json to_json() const override {
-        return TunableValue(_value).to_json();
-    }
+    // TODO: Add to_json for arbitrary T
+    //    nlohmann::json to_json() const override {
+    //        return TunableValue(_value).to_json();
+    //    }
 
   private:
     T _value;
