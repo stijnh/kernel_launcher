@@ -224,9 +224,9 @@ expr_type<T> expr(T value) {
         return class_name<expr_type<L>>(expr(std::move(lhs)));                 \
     }
 
-UNARY_OP_IMPL(Neg, std::negate<void> {}, -)
-UNARY_OP_IMPL(Not, std::logical_not<void> {}, !)
-UNARY_OP_IMPL(Inv, std::bit_not<void> {}, ~)
+UNARY_OP_IMPL(NegExpr, std::negate<void> {}, -)
+UNARY_OP_IMPL(NotExpr, std::logical_not<void> {}, !)
+UNARY_OP_IMPL(InvExpr, std::bit_not<void> {}, ~)
 #undef UNARY_OP_IMPL
 
 #define BINARY_OP_IMPL(class_name, fun, op)                                 \
