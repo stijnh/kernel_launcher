@@ -216,7 +216,7 @@ namespace detail {
             // Repeatedly copy data, doubling buffer size each time
             for (size_t k = initial_size; k < n; k *= 2) {
                 size_t len = std::min(n - k, k);
-                view.slice(0, len).copy_to(view.slice(k, len));
+                view.slice(k, len).copy_from(view.slice(0, len));
             }
         }
     };
@@ -260,120 +260,110 @@ namespace detail {
     };
 }  // namespace detail
 
-template<typename T>
-struct MemoryView {
-    MemoryView() {
-        device_ptr_ = nullptr;
-        size_ = 0;
+template<typename Impl, typename T>
+struct MemoryBase {
+    MemoryView<T> view() {
+        return MemoryView<T>(((Impl*)this)->data(), ((Impl*)this)->size());
     }
 
-    MemoryView(const MemoryView<T>& mem) {
-        device_ptr_ = (T*)mem.data();
-        size_ = mem.size();
-    }
-
-    MemoryView(const Memory<T>& mem) {
-        device_ptr_ = (T*)mem.data();
-        size_ = mem.size();
-    }
-
-    MemoryView(Memory<T>&& mem) = delete;
-
-    MemoryView(T* device_ptr, size_t n) {
-        device_ptr_ = device_ptr;
-        size_ = n;
-    }
-
-    void copy_to(MemoryView<T> m) const {
-        if (this->size() != m.size()) {
-            throw std::runtime_error("size mismatch");
-        }
-
-        KERNEL_LAUNCHER_ASSERT(cuMemcpy(
-            (CUdeviceptr)m.device_ptr_,
-            (CUdeviceptr)this->device_ptr_,
-            this->size_in_bytes()));
-    }
-
-    void copy_from(MemoryView<T> m) {
-        m.copy_to(*this);
-    }
-
-    void copy_to(T* ptr, size_t n) const {
-        copy_to(MemoryView<T>(ptr, n));
-    }
-
-    void copy_to(std::vector<T>& v) const {
-        copy_to(v.data(), v.size());
-    }
-
-    void copy_from(const T* ptr, size_t n) {
-        copy_from(MemoryView<T>((T*)ptr, n));
-    }
-
-    void copy_from(const std::vector<T>& v) {
-        copy_from(v.data(), v.size());
-    }
-
-    std::vector<T> to_vector() const {
-        std::vector<T> data(size());
-        copy_to(data);
-        return data;
-    }
-
-    T* data() {
-        return device_ptr_;
-    }
-
-    const T* data() const {
-        return device_ptr_;
-    }
-
-    operator T*() {
-        return data();
-    }
-
-    operator const T*() const {
-        return data();
-    }
-
-    size_t size() const {
-        return size_;
+    MemoryView<const T> view() const {
+        return MemoryView<const T>(
+            ((Impl*)this)->data(),
+            ((Impl*)this)->size());
     }
 
     size_t size_in_bytes() const {
-        return size_ * sizeof(T);
+        return view().size() * sizeof(T);
     }
 
-    MemoryView<T> slice(size_t start, size_t len) const {
-        if (start + len >= size_) {  // TODO check overflow
-            throw std::runtime_error("index out of bounds");
-        }
+    operator T*() {
+        return view().data();
+    }
 
-        return MemoryView(device_ptr_ + start, len);
+    operator const T*() const {
+        return view().data();
     }
 
     Memory<T> clone() const {
-        Memory<T> new_buffer = Memory<T>(size());
+        Memory<T> new_buffer = Memory<T>(view().size());
         new_buffer.copy_from(*this);
         return new_buffer;
     }
 
     void fill(T value) {
-        detail::MemoryFill<T>::call(device_ptr_, size_, value);
+        detail::MemoryFill<T>::call(view().data(), view().size(), value);
     }
 
     void fill_zeros() {
-        detail::MemoryFill<char>::call((char*)device_ptr_, size_in_bytes(), 0);
+        fill((T)0);
     }
 
-  protected:
-    T* device_ptr_;
-    size_t size_;
+    void copy_to(T* ptr, size_t n) const {
+        auto v = view();
+
+        if (v.size() != n) {
+            throw std::runtime_error("size mismatch");
+        }
+
+        KERNEL_LAUNCHER_ASSERT(cuMemcpy(
+            (CUdeviceptr)ptr,
+            (CUdeviceptr)v.data(),
+            v.size_in_bytes()));
+    }
+
+    void copy_from(const T* ptr, size_t n) {
+        auto v = view();
+
+        if (v.size() != n) {
+            throw std::runtime_error("size mismatch");
+        }
+
+        KERNEL_LAUNCHER_ASSERT(cuMemcpy(
+            (CUdeviceptr)v.data(),
+            (CUdeviceptr)ptr,
+            v.size_in_bytes()));
+    }
+
+    template<typename I>
+    void copy_to(MemoryBase<I, T>& c) const {
+        auto v = c.view();
+        copy_to(v.data(), v.size());
+    }
+
+    template<typename I>
+    void copy_from(const MemoryBase<I, T>& c) {
+        auto v = c.view();
+        copy_from(v.data(), v.size());
+    }
+
+    void copy_to(std::vector<T>& c) const {
+        copy_to(c.data(), c.size());
+    }
+
+    void copy_from(const std::vector<T>& c) {
+        copy_from(c.data(), c.size());
+    }
+
+    std::vector<T> to_vector() const {
+        std::vector<T> result(view().size());
+        copy_to(result);
+        return result;
+    }
+
+    MemoryView<T> slice(size_t start, size_t len) {
+        auto v = view();
+        if (start + len >= v.size()) {  // TODO check overflow
+            throw std::runtime_error("index out of bounds");
+        }
+
+        return MemoryView<T>(v.data() + start, len);
+    }
 };
 
 template<typename T>
-struct Memory: MemoryView<T> {
+struct Memory: MemoryBase<Memory<T>, T> {
+    using value_type = T;
+
     Memory(const Memory&) = delete;
     Memory& operator=(const Memory&) = delete;
 
@@ -432,9 +422,60 @@ struct Memory: MemoryView<T> {
         }
     }
 
-    MemoryView<T> view() const {
-        return MemoryView<T>(this->device_ptr_, this->size_);
+    T* data() {
+        return device_ptr_;
     }
+
+    const T* data() const {
+        return device_ptr_;
+    }
+
+    size_t size() const {
+        return size_;
+    }
+
+  private:
+    T* device_ptr_ = nullptr;
+    size_t size_ = 0;
+};
+
+template<typename T>
+struct MemoryView: MemoryBase<MemoryView<T>, T> {
+    using value_type = T;
+
+    MemoryView() = default;
+    MemoryView(const MemoryView&) = default;
+    MemoryView(MemoryView&&) = default;
+    MemoryView<T>& operator=(const MemoryView<T>&) = default;
+    MemoryView<T>& operator=(MemoryView<T>&&) noexcept = default;
+
+    MemoryView(T* ptr, size_t size) : device_ptr_(ptr), size_(size) {
+        //
+    }
+
+    MemoryView(Memory<T>& mem) : device_ptr_(mem.data()), size_(mem.size()) {
+        //
+    }
+
+    MemoryView(const Memory<T>& mem) :
+        device_ptr_(mem.data()),
+        size_(mem.size()) {
+        //
+    }
+
+    MemoryView(Memory<T>&& mem) = delete;
+
+    T* data() const {
+        return device_ptr_;
+    }
+
+    size_t size() const {
+        return size_;
+    }
+
+  private:
+    T* device_ptr_ = nullptr;
+    size_t size_ = 0;
 };
 
 }  // namespace kernel_launcher
