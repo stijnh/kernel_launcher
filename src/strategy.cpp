@@ -120,7 +120,7 @@ bool CachingStrategy::init(const KernelBuilder& builder, Config& config) {
     }
 
     Config best_config;
-    if (cache_.initialize(filename_, builder, best_config)) {
+    if (cache_.open(filename_, builder, best_config)) {
         first_run_ = true;
         first_config_ = std::move(config);
         config = std::move(best_config);

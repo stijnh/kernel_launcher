@@ -117,7 +117,7 @@ static void assert_header_correct(
     }
 }
 
-bool TuningCache::initialize(
+bool TuningCache::open(
     std::string filename,
     const KernelBuilder& builder,
     Config& best_config) {

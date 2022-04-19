@@ -5,7 +5,7 @@
 namespace kernel_launcher {
 
 struct TuningCache {
-    bool initialize(
+    bool open(
         std::string filename,
         const KernelBuilder& builder,
         Config& best_config);

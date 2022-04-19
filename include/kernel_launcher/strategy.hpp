@@ -140,7 +140,7 @@ namespace experimental {
         Config best_config;
         double best_performance = -1e99;
 
-        if (cache.initialize(std::move(filename), builder, current)) {
+        if (cache.open(std::move(filename), builder, current)) {
             return current;
         }
 
