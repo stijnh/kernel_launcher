@@ -14,16 +14,17 @@ using TF = double;
 
 
 int main() {
-    const unsigned int N = 4096;
+    const unsigned int N = 4096 * 2;
 
     // Builder kernel
     auto builder = kl::KernelBuilder("matmul.cu", "matmul_kernel");
-    auto bx = builder.tune("block_size_x", {1, 2, 4, 8, 16, 32, 64, 128, 256});
-    auto by = builder.tune("block_size_y", {1, 2, 4, 8, 16, 32, 64, 128, 256});
-    auto tx = builder.tune("tile_size_x", {1, 2, 4, 8, 16, 32, 64, 128});
+//    auto bx = builder.tune("block_size_x", {1, 2, 4, 8, 16, 32, 64, 128, 256}, 16);
+    auto by = builder.tune("block_size_y", {1, 2, 4, 8, 16, 32, 64, 128, 256}, 16);
+    auto tx = builder.tune("tile_size_x", {1, 2, 4, 8, 16, 32, 64, 128}, 16);
     auto ty = builder.tune("tile_size_y", {1, 2, 4, 8, 16, 32, 64, 128});
     auto m = builder.tune("blocks_per_sm", {1, 2, 3, 4, 5, 6, 7, 8});
 
+    auto bx = by * ty;
     auto threads_per_sm = bx * by * m;
     auto threads_per_block = bx * by;
     builder.restrict(threads_per_sm >= 128);
@@ -55,7 +56,7 @@ int main() {
     std::vector<TF> B(N * N);
     std::vector<TF> C(N * N);
 
-    for (int i = 0; i < N * N; i++) {
+    for (unsigned int i = 0; i < N * N; i++) {
         A[i] = rand() % 100;
         B[i] = rand() % 100;
     }
@@ -68,29 +69,38 @@ int main() {
 
     // Compile kernel
     std::string cache_file = "matmul_";
-    cache_file += kl::CudaDevice::current().name() + "_" + kl::type_name<TF>() + ".json";
+    cache_file += std::to_string(N) + "_";
+    cache_file += kl::CudaDevice::current().name() + "_";
+    cache_file += kl::type_name<TF>();
+    cache_file += ".json";
 
-    auto compiler = std::make_unique<kl::AsyncCompiler>(kl::NvrtcCompiler{});
-    auto strategy =  std::make_unique<kl::CachingStrategy>(cache_file, kl::RandomStrategy());
+    auto compiler = kl::AsyncCompiler(kl::NvrtcCompiler{});
+    auto strategy =  kl::strategy::limit(
+            50,
+            kl::strategy::cache(
+                    cache_file,
+                    kl::strategy::random()
+            )
+    );
 
-    auto kernel = kl::TuneKernel<TF*, const TF*, const TF*>(
+    kl::TuneKernel<TF*, const TF*, const TF*> kernel;
+    kernel.initialize(
             builder,
             std::move(strategy),
-            std::move(compiler)
+            compiler
     );
 
     auto t_start = std::chrono::high_resolution_clock::now();
 
     for (int i = 0; i < 10000; i++) {
         kernel(stream, N, N)(dev_C, dev_A, dev_B);
+
         CUDA_CHECK(cudaStreamSynchronize(stream));
 
-        if (i % 10 == 0) {
-            auto t_end = std::chrono::high_resolution_clock::now();
-            double elapsed_time_ms = std::chrono::duration<double, std::milli>(t_end-t_start).count();
-            std::cout << "elapsed: " << elapsed_time_ms << std::endl;
-            t_start = t_end;
-        }
+        auto t_end = std::chrono::high_resolution_clock::now();
+        double elapsed_time_ms = std::chrono::duration<double, std::milli>(t_end-t_start).count();
+        std::cout << "elapsed: " << elapsed_time_ms << std::endl;
+        t_start = t_end;
     }
 
 

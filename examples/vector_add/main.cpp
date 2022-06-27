@@ -40,7 +40,7 @@ int main() {
     builder.template_args(kl::type_of<float>(), b);
 
     // Compile kernel
-    auto config = builder.sample_config();
+    auto config = builder.random_config();
     auto kernel = kl::Kernel<float*,  const float*,  const float*, int>::load(builder, config);
 
     // Run kernel

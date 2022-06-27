@@ -52,7 +52,7 @@ matmul_kernel(TF *C, const TF *A, const TF *B) {
     float sum[tile_size_y][tile_size_x];
     #pragma unroll
     for (int i = 0; i < tile_size_y; i++) {
-        #pragma unroll
+        #pragma unroll(unrol_factor)
         for (int j = 0; j < tile_size_x; j++) {
             sum[i][j] = 0.0f;
         }
