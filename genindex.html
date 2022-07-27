@@ -650,7 +650,7 @@
 </li>
       <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomKernel5impl_E">kernel_launcher::WisdomKernel::impl_ (C++ member)</a>
 </li>
-      <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomKernel10initializeENSt6stringE13KernelBuilder8CompilerNSt10shared_ptrI20WisdomKernelSettingsEE">kernel_launcher::WisdomKernel::initialize (C++ function)</a>
+      <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomKernel10initializeENSt6stringE13KernelBuilder8Compiler14WisdomSettings">kernel_launcher::WisdomKernel::initialize (C++ function)</a>
 </li>
       <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomKernel11instantiateE12cudaStream_t11ProblemSize">kernel_launcher::WisdomKernel::instantiate (C++ function)</a>
 </li>
@@ -660,7 +660,7 @@
 </li>
       <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomKernelclE11ProblemSize">kernel_launcher::WisdomKernel::operator() (C++ function)</a>, <a href="api.html#_CPPv4N15kernel_launcher12WisdomKernelclE12cudaStream_t11ProblemSize">[1]</a>, <a href="api.html#_CPPv4N15kernel_launcher12WisdomKernelclE12cudaStream_t8uint32_t8uint32_t8uint32_t">[2]</a>, <a href="api.html#_CPPv4N15kernel_launcher12WisdomKernelclE8uint32_t8uint32_t8uint32_t">[3]</a>
 </li>
-      <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomKernel12WisdomKernelENSt6stringE13KernelBuilder8CompilerNSt10shared_ptrI20WisdomKernelSettingsEE">kernel_launcher::WisdomKernel::WisdomKernel (C++ function)</a>, <a href="api.html#_CPPv4N15kernel_launcher12WisdomKernel12WisdomKernelEv">[1]</a>
+      <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomKernel12WisdomKernelENSt6stringE13KernelBuilder8Compiler14WisdomSettings">kernel_launcher::WisdomKernel::WisdomKernel (C++ function)</a>, <a href="api.html#_CPPv4N15kernel_launcher12WisdomKernel12WisdomKernelERR12WisdomKernel">[1]</a>, <a href="api.html#_CPPv4N15kernel_launcher12WisdomKernel12WisdomKernelEv">[2]</a>
 </li>
       <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomKernelD0Ev">kernel_launcher::WisdomKernel::~WisdomKernel (C++ function)</a>
 </li>
@@ -678,24 +678,6 @@
 </li>
       <li><a href="api.html#_CPPv4N15kernel_launcher18WisdomKernelLaunch18WisdomKernelLaunchE12cudaStream_t11ProblemSizeR12WisdomKernel">kernel_launcher::WisdomKernelLaunch::WisdomKernelLaunch (C++ function)</a>
 </li>
-      <li><a href="api.html#_CPPv4N15kernel_launcher20WisdomKernelSettingsE">kernel_launcher::WisdomKernelSettings (C++ struct)</a>
-</li>
-      <li><a href="api.html#_CPPv4NK15kernel_launcher20WisdomKernelSettings26does_kernel_require_tuningERKNSt6stringE11ProblemSize">kernel_launcher::WisdomKernelSettings::does_kernel_require_tuning (C++ function)</a>
-</li>
-      <li><a href="api.html#_CPPv4N15kernel_launcher20WisdomKernelSettings11tuning_dir_E">kernel_launcher::WisdomKernelSettings::tuning_dir_ (C++ member)</a>
-</li>
-      <li><a href="api.html#_CPPv4NK15kernel_launcher20WisdomKernelSettings16tuning_directoryEv">kernel_launcher::WisdomKernelSettings::tuning_directory (C++ function)</a>
-</li>
-      <li><a href="api.html#_CPPv4NK15kernel_launcher20WisdomKernelSettings15tuning_patternsEv">kernel_launcher::WisdomKernelSettings::tuning_patterns (C++ function)</a>
-</li>
-      <li><a href="api.html#_CPPv4N15kernel_launcher20WisdomKernelSettings16tuning_patterns_E">kernel_launcher::WisdomKernelSettings::tuning_patterns_ (C++ member)</a>
-</li>
-      <li><a href="api.html#_CPPv4N15kernel_launcher20WisdomKernelSettings11wisdom_dir_E">kernel_launcher::WisdomKernelSettings::wisdom_dir_ (C++ member)</a>
-</li>
-      <li><a href="api.html#_CPPv4NK15kernel_launcher20WisdomKernelSettings16wisdom_directoryEv">kernel_launcher::WisdomKernelSettings::wisdom_directory (C++ function)</a>
-</li>
-      <li><a href="api.html#_CPPv4N15kernel_launcher20WisdomKernelSettings20WisdomKernelSettingsENSt6stringENSt6stringENSt6vectorINSt6stringEEE">kernel_launcher::WisdomKernelSettings::WisdomKernelSettings (C++ function)</a>
-</li>
       <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomResultE">kernel_launcher::WisdomResult (C++ enum)</a>
 </li>
       <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomResult14DeviceMismatchE">kernel_launcher::WisdomResult::DeviceMismatch (C++ enumerator)</a>
@@ -705,6 +687,22 @@
       <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomResult2OkE">kernel_launcher::WisdomResult::Ok (C++ enumerator)</a>
 </li>
       <li><a href="api.html#_CPPv4N15kernel_launcher12WisdomResult19ProblemSizeMismatchE">kernel_launcher::WisdomResult::ProblemSizeMismatch (C++ enumerator)</a>
+</li>
+      <li><a href="api.html#_CPPv4N15kernel_launcher14WisdomSettingsE">kernel_launcher::WisdomSettings (C++ struct)</a>
+</li>
+      <li><a href="api.html#_CPPv4NK15kernel_launcher14WisdomSettings26does_kernel_require_tuningERKNSt6stringE11ProblemSize">kernel_launcher::WisdomSettings::does_kernel_require_tuning (C++ function)</a>
+</li>
+      <li><a href="api.html#_CPPv4N15kernel_launcher14WisdomSettings5impl_E">kernel_launcher::WisdomSettings::impl_ (C++ member)</a>
+</li>
+      <li><a href="api.html#_CPPv4NK15kernel_launcher14WisdomSettings16tuning_directoryEv">kernel_launcher::WisdomSettings::tuning_directory (C++ function)</a>
+</li>
+      <li><a href="api.html#_CPPv4NK15kernel_launcher14WisdomSettings15tuning_patternsEv">kernel_launcher::WisdomSettings::tuning_patterns (C++ function)</a>
+</li>
+      <li><a href="api.html#_CPPv4NK15kernel_launcher14WisdomSettings16wisdom_directoryEv">kernel_launcher::WisdomSettings::wisdom_directory (C++ function)</a>
+</li>
+      <li><a href="api.html#_CPPv4N15kernel_launcher14WisdomSettings14WisdomSettingsENSt6stringENSt6stringENSt6vectorINSt6stringEEE">kernel_launcher::WisdomSettings::WisdomSettings (C++ function)</a>, <a href="api.html#_CPPv4N15kernel_launcher14WisdomSettings14WisdomSettingsERK14WisdomSettings">[1]</a>, <a href="api.html#_CPPv4N15kernel_launcher14WisdomSettings14WisdomSettingsERR14WisdomSettings">[2]</a>
+</li>
+      <li><a href="api.html#_CPPv4N15kernel_launcher14WisdomSettingsD0Ev">kernel_launcher::WisdomSettings::~WisdomSettings (C++ function)</a>
 </li>
       <li><a href="api.html#c.KERNEL_LAUNCHER_CUDA_CHECK">KERNEL_LAUNCHER_CUDA_CHECK (C macro)</a>
 </li>
