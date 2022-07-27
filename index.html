@@ -43,6 +43,8 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">Kernel Launcher</a></li>
 <li class="toctree-l1"><a class="reference internal" href="install.html">Installation Guide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="example.html">Advanced Example</a></li>
+<li class="toctree-l1"><a class="reference internal" href="wisdom.html">Wisdom Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
 </ul>
 
@@ -77,8 +79,8 @@
 <p><em>Kernel Launcher</em> is a C++ library that makes it easy to dynamically compile <em>CUDA</em> kernels at run time (using <a class="reference external" href="https://docs.nvidia.com/cuda/nvrtc/index.html">NVRTC</a>) and call them in easy type-safe way using C++ magic.
 There are two reasons for using run-time compilation:</p>
 <ul class="simple">
-<li><p>Kernels that have tunable parameters (block size, elements per thread, loop unroll factors, etc.) where the optimal configuration can only be determined at runtime since they depend factors such as the type of GPU and the problem size.</p></li>
-<li><p>Increase performance by injecting runtime values as compile-time constant values into the kernel code (dimensions, array strides, weights, etc.).</p></li>
+<li><p>Kernels that have tunable parameters (block size, elements per thread, loop unroll factors, etc.) where the optimal configuration can only be determined at runtime since it depends dynamic factors such as the type of GPU and the problem size.</p></li>
+<li><p>Improve performance by injecting runtime values as compile-time constant values into kernel code (dimensions, array strides, weights, etc.).</p></li>
 </ul>
 </section>
 <section id="basic-example">
@@ -99,7 +101,7 @@ This kernel has a template parameter <code class="docutils literal notranslate">
 <span class="p">}</span><span class="w"></span>
 </pre></div>
 </div>
-<p>The following snippet shows how to use <em>Kernel Launcher</em> in host code:</p>
+<p>The following C++ snippet shows how to use <em>Kernel Launcher</em> in host code:</p>
 <div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;kernel_launcher.h&quot;</span><span class="cp"></span>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
